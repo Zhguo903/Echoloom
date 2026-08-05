@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8dec7"/><stop offset="1" stop-color="#dda987"/></linearGradient>
+    <linearGradient id="jacket" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#91ad9d"/><stop offset="1" stop-color="#52725f"/></linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5c3d2c"/><stop offset="1" stop-color="#a66c43"/></linearGradient>
+  </defs>
+  <path d="M68 800c19-139 68-230 177-276l27-70h80l29 68c111 43 160 138 178 278z" fill="url(#jacket)"/>
+  <path d="M264 418l-10 108 68 53 68-57-18-111z" fill="url(#skin)"/>
+  <path d="M176 242c2 119 31 200 97 241 36 22 83 20 116-5 61-46 80-132 59-244-15-80-71-131-141-130-76 1-132 61-131 138z" fill="url(#skin)"/>
+  <path d="M170 278c-24-85 8-173 98-207 89-34 184 10 208 98 12 43 4 91-15 133-13-58-40-104-78-137-45 38-103 60-174 52-9 32-13 63-14 93z" fill="url(#hair)"/>
+  <path d="M183 209c20-76 86-128 164-124-31 18-57 43-76 76 54-43 113-51 171-20-49 0-91 14-126 44 55-20 104-14 146 18" fill="none" stroke="#70472f" stroke-width="22" stroke-linecap="round"/>
+  <path d="M218 282c19-10 40-9 59-1M341 278c18-7 36-5 52 4" fill="none" stroke="#684636" stroke-width="7" stroke-linecap="round"/>
+  <path d="M227 304c17 15 40 15 59 0-21 7-40 7-59 0zm109-1c17 15 40 16 57 1-20 6-38 6-57-1z" fill="#fff"/>
+  <ellipse cx="260" cy="307" rx="9" ry="11" fill="#8c674f"/><ellipse cx="367" cy="307" rx="9" ry="11" fill="#8c674f"/>
+  <path d="M312 310c-3 24-1 41 11 48 8 4 17 2 23-4" fill="none" stroke="#c7856d" stroke-width="4" stroke-linecap="round"/>
+  <path d="M270 374c31 25 68 26 98 0" fill="none" stroke="#9f5f58" stroke-width="6" stroke-linecap="round"/>
+  <path d="M241 530l81 54 78-57 72 42-43 231H192l-38-232z" fill="#fbf8f1" opacity=".9"/>
+  <path d="M322 585v215" stroke="#52725f" stroke-width="5"/>
+  <path d="M244 529l78 55-43 44-62-78zm157-3-79 58 43 44 61-79z" fill="#dfe9e2" stroke="#789787" stroke-width="4"/>
+  <path d="M176 567c30 19 53 43 69 74M455 560c-26 25-45 51-58 82" fill="none" stroke="#344056" stroke-width="15"/>
+  <g transform="translate(348 585) rotate(-4)">
+    <rect width="151" height="94" rx="12" fill="#f4ead8" stroke="#c8b28d" stroke-width="5"/>
+    <path d="M16 22h119M75 22v56M24 69l33-27 28 18 35-26" fill="none" stroke="#789787" stroke-width="5"/>
+    <circle cx="118" cy="70" r="8" fill="#586580"/>
+  </g>
+</svg>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1324" />
+  <meta name="description" content="EchoLoom story-first AI relationship interactive prototype" />
+  <title>EchoLoom Interactive Demo</title>
+  <link rel="icon" href="assets/brand/echoloom-app-icon.png" type="image/png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="app/styles.css?v=44" />
+</head>
+<body>
+  <div class="ambient-orb ambient-orb-a" aria-hidden="true"></div>
+  <div class="ambient-orb ambient-orb-b" aria-hidden="true"></div>
+
+  <div class="demo-shell" id="demo-shell">
+    <aside class="desktop-panel desktop-panel-left" aria-label="Demo navigation">
+      <div class="panel-brand">
+        <img class="panel-brand-lockup" src="assets/brand/echoloom-lockup.png" alt="EchoLoom — Stories weave. Companions stay." />
+        <span id="desktop-demo-badge">Offline Prototype</span>
+      </div>
+      <div id="desktop-nav"></div>
+      <div class="panel-insight">
+        <span class="eyebrow" id="principle-label">设计原则</span>
+        <p id="principle-text"></p>
+      </div>
+    </aside>
+
+    <main class="phone-stage">
+      <div class="phone-shadow" aria-hidden="true"></div>
+      <div class="phone-frame" id="phone-frame">
+        <div class="phone-speaker" aria-hidden="true"></div>
+        <div class="phone-side phone-side-left-a" aria-hidden="true"></div>
+        <div class="phone-side phone-side-left-b" aria-hidden="true"></div>
+        <div class="phone-side phone-side-right" aria-hidden="true"></div>
+        <div id="app" class="app-viewport"></div>
+      </div>
+    </main>
+
+    <aside class="desktop-panel desktop-panel-right" aria-label="Prototype controls">
+      <div class="panel-heading-row">
+        <div>
+          <span class="eyebrow" id="control-eyebrow">Prototype</span>
+          <h2 id="control-title">演示控制</h2>
+        </div>
+        <button class="icon-button" type="button" data-desktop-action="focus" aria-label="Focus mode" title="Focus mode">
+          <span aria-hidden="true">⛶</span>
+        </button>
+      </div>
+      <p class="panel-copy" id="prototype-hint"></p>
+      <div class="control-stack">
+        <button class="desktop-control" type="button" data-desktop-action="language">
+          <span class="control-icon">文</span>
+          <span id="language-control-label">English / 中文</span>
+          <span class="control-chevron">›</span>
+        </button>
+        <button class="desktop-control" type="button" data-desktop-action="export">
+          <span class="control-icon">⇩</span>
+          <span id="export-control-label">导出关系档案</span>
+          <span class="control-chevron">›</span>
+        </button>
+        <label class="desktop-control file-control" for="import-file">
+          <span class="control-icon">⇧</span>
+          <span id="import-control-label">导入关系档案</span>
+          <span class="control-chevron">›</span>
+        </label>
+        <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json" />
+        <button class="desktop-control danger" type="button" data-desktop-action="reset">
+          <span class="control-icon">↺</span>
+          <span id="reset-control-label">重置原型</span>
+          <span class="control-chevron">›</span>
+        </button>
+      </div>
+      <div class="status-card">
+        <span class="status-dot"></span>
+        <div>
+          <strong id="offline-label">离线交互原型 · 无需 API</strong>
+          <span id="codex-ready-label"></span>
+        </div>
+      </div>
+      <div class="keyboard-help">
+        <kbd>←</kbd><kbd>→</kbd>
+        <span>Navigate demo screens</span>
+      </div>
+    </aside>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="app/data.js?v=21"></script>
+  <script src="app/storage.js?v=12"></script>
+  <script src="app/story-engine.js?v=6"></script>
+  <script src="app/reply-timing.js?v=2"></script>
+  <script src="app/app.js?v=33"></script>
+</body>
+</html>

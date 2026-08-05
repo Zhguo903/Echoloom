@@ -1,0 +1,14 @@
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+coverage/
+dist/
+
+# Generated report previews and extracted assignment pages.
+# Keep the final report in output/report/ and the report source in tmp/report_work/.
+tmp/report_render*/
+tmp/pdfs/

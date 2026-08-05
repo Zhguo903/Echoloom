@@ -1,0 +1,3 @@
+EchoLoom prototype files are provided for the user's coursework, concept testing, and portfolio development.
+The generated/original visual assets in this package may be edited for this project.
+No third-party game characters, logos, or proprietary source assets are included.

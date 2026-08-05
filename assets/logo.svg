@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+<defs>
+  <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#586580"/><stop offset=".52" stop-color="#7d9b8c"/><stop offset="1" stop-color="#c8ad7f"/></linearGradient>
+  <filter id="s"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#8d7c5e" flood-opacity=".18"/></filter>
+</defs>
+<circle cx="120" cy="120" r="86" fill="none" stroke="url(#g)" stroke-width="5" stroke-linecap="round" stroke-dasharray="420 80" filter="url(#s)"/>
+<path d="M75 143c28-4 50-23 67-58 4 38-12 67-52 85 22 0 43-8 67-25-11 33-41 50-76 47 17-8 29-19 38-33-15 8-30 11-44 10 13-8 24-17 32-27-11 4-22 5-32 1z" fill="url(#g)"/>
+<path d="M88 176c30-19 52-48 67-88" fill="none" stroke="#f7f0df" stroke-width="4" stroke-linecap="round"/>
+<g fill="#c8ad7f"><path d="M58 78l4 9 9 4-9 4-4 9-4-9-9-4 9-4z"/><path d="M176 62l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/><circle cx="187" cy="117" r="4"/></g>
+</svg>

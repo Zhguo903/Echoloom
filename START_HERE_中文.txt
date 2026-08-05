@@ -1,0 +1,44 @@
+EchoLoom 可运行 Demo —— 从这里开始
+====================================
+
+这是一个真正可以点击、输入、生成场景、保存关系记忆的本地交互 Demo。
+默认使用离线故事引擎，不需要账号、API Key 或 npm install。
+
+【macOS】
+1. 安装 Node.js 18 或更新版本。
+2. 双击 run-mac.command。
+3. 浏览器会自动打开 http://127.0.0.1:5173
+若系统阻止运行，请右键 run-mac.command → 打开。
+
+【Windows】
+1. 安装 Node.js 18 或更新版本。
+2. 双击 run-windows.bat。
+
+【终端通用方式】
+进入本文件所在文件夹后运行：
+
+  npm start
+
+【没有 Node.js 时的备用方式】
+macOS / Linux 可运行：
+
+  ./run-python-fallback.sh
+
+【推荐体验流程】
+17 秒停电 → 从祁安、沈曜、黎川、周棠、闻笙的五处信号中先回应一处 → 解锁“回声终端 EchoLink” → 查看联系人取得方式 → 处理角色私聊或六人群聊 → 查看关系观测与通信脉冲 → 在 EchoLink 档案中回溯 → 认识全部五人并处理“无编号少女”事件 → 通过闻笙入口保存世界与 NPC 设定卡。
+
+关系数值不会自动确认恋爱、排他或身体亲密。只有双方确认对话能改变关系标签。
+
+【用 Codex 修改】
+先阅读 CODEX_START_HERE.md。
+在项目根目录运行：
+
+  codex
+
+Codex 会读取 AGENTS.md。可直接复制 CODEX_PROMPTS.md 中的任务。
+
+【自动检查】
+
+  npm test
+
+更详细的中文说明见 README_ZH.md。

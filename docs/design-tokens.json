@@ -1,0 +1,28 @@
+{
+  "product": "EchoLoom",
+  "colors": {
+    "slate": "#586580",
+    "slateDeep": "#344056",
+    "slateSoft": "#DFE4EA",
+    "sage": "#789787",
+    "sageDeep": "#52725F",
+    "sageSoft": "#E2EBE4",
+    "champagne": "#C8B28D",
+    "champagneDeep": "#A98657",
+    "champagneSoft": "#F1E8D8",
+    "ivory": "#FBF8F1",
+    "paper": "#FFFDF8",
+    "charcoal": "#283241"
+  },
+  "radii": {
+    "small": 12,
+    "medium": 17,
+    "large": 22,
+    "extraLarge": 28
+  },
+  "mobileFrame": {
+    "width": 393,
+    "height": 852
+  },
+  "navigation": ["Home", "Threads", "Together", "Echoes"]
+}

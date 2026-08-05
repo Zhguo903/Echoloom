@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f2d8c7"/><stop offset="1" stop-color="#d7ab99"/></linearGradient>
+    <linearGradient id="uniform" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#65718a"/><stop offset="1" stop-color="#344056"/></linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1f2633"/><stop offset="1" stop-color="#465268"/></linearGradient>
+  </defs>
+  <path d="M72 800c16-144 63-238 174-284l31-72h79l29 72c111 43 160 140 176 284z" fill="url(#uniform)"/>
+  <path d="M266 412l-10 112 64 55 69-54-17-121z" fill="url(#skin)"/>
+  <path d="M177 238c-1 121 25 205 93 247 35 22 83 21 117-4 62-46 84-134 64-249-15-84-73-137-143-134-76 3-130 61-131 140z" fill="url(#skin)"/>
+  <path d="M172 273c-21-91 20-177 112-207 88-28 177 20 192 111 7 42-2 88-22 126-10-51-31-93-65-126-51 35-109 49-173 42-11 30-19 61-23 93z" fill="url(#hair)"/>
+  <path d="M186 213c8-75 60-136 137-151-24 22-40 49-50 81 50-53 111-68 170-37-49 7-88 27-117 61 47-27 91-29 131-7" fill="none" stroke="#263040" stroke-width="20" stroke-linecap="round"/>
+  <path d="M219 280c18-10 39-11 59-4M340 275c18-8 37-7 54 2" fill="none" stroke="#43404a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M228 302c17 14 40 14 58 0-21 6-40 6-58 0zm108-2c17 14 40 15 57 1-20 5-38 5-57-1z" fill="#fff"/>
+  <ellipse cx="260" cy="305" rx="9" ry="11" fill="#586580"/><ellipse cx="367" cy="304" rx="9" ry="11" fill="#586580"/>
+  <path d="M313 307c-4 25-2 43 10 50 8 4 17 3 24-3" fill="none" stroke="#bf8878" stroke-width="4" stroke-linecap="round"/>
+  <path d="M278 378c27 8 55 8 82-2" fill="none" stroke="#8f5f62" stroke-width="5" stroke-linecap="round"/>
+  <path d="M246 525l74 59 76-61 68 42-32 235H203l-43-234z" fill="#47546c"/>
+  <path d="M320 585v215" stroke="#9ba7b8" stroke-width="5"/>
+  <path d="M245 526l75 59-44 47-52-80zm152-2-77 61 43 46 57-81z" fill="#f2f4f3" opacity=".9"/>
+  <g transform="translate(360 570)">
+    <rect width="164" height="112" rx="15" fill="#263348" stroke="#9fb6c0" stroke-width="5"/>
+    <path d="M20 78l28-30 25 18 29-40 42 52" fill="none" stroke="#c8b28d" stroke-width="6"/>
+    <circle cx="102" cy="26" r="7" fill="#789787"/><path d="M20 90h124" stroke="#dfe4ea" stroke-width="4" opacity=".7"/>
+  </g>
+</svg>

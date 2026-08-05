@@ -1,0 +1,17 @@
+{
+  "name": "EchoLoom Interactive Demo",
+  "short_name": "EchoLoom",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1324",
+  "theme_color": "#0f1324",
+  "description": "A story-first AI relationship product prototype.",
+  "icons": [
+    {
+      "src": "assets/brand/echoloom-app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
