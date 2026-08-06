@@ -1,5 +1,47 @@
 # EchoLink MVP Plan
 
+## Four-week validation plan from the current MVP — 2026-08-07 to 2026-09-03
+
+### Current baseline
+
+The schema-v8 offline MVP is complete and testable end to end: Xu Cheng's five-anchor investigation, five first-response routes, EchoLink, source-linked and user-controllable memories, branch rewind, relationship archives, the Weaver tutorial and Workshop, narrative-only packaged backgrounds, bilingual copy, and local export/import. The automated smoke, migration, state, and character-engine suites pass. The remaining work is product validation, targeted refinement, a deliberately constrained live-AI feasibility spike, and a pilot-ready hand-off—not expansion of the character or chapter catalogue.
+
+### Week 1 — Aug. 7–13: evidence baseline
+
+- Freeze the schema-v8 demo and define success measures for comprehension, continuity, trust, task completion, and emotional credibility.
+- Recruit 6–8 target participants and test the opening, first rescue, first investigation chapter, EchoLink, memory controls, and branch recovery.
+- Produce a ranked issue log with direct observations, severity, affected journey, and a clear keep/change/cut decision.
+- Saria owns the test build, lightweight event logging, bug triage, and mobile/desktop fixes; Roxy owns the screener, recruitment, moderation, synthesis, and presentation update.
+
+### Week 2 — Aug. 14–20: continuity and trust refinement
+
+- Fix the highest-impact usability issues without changing the product concept or adding new journeys.
+- Simplify relationship and memory language where needed; verify source links, edit/delete controls, branch rewind, and export/import recovery.
+- Run a focused five-user retest on the revised trust and continuity interactions.
+- Saria owns state/storage fixes, accessibility, and regression coverage; Roxy owns UX copy, sessions, findings, and prioritisation.
+
+### Week 3 — Aug. 21–27: constrained live-AI spike
+
+- Add one optional server-side provider for one character while preserving the existing `EchoEngine` contract and deterministic offline default/fallback.
+- Scope context to the selected character and relevant source-linked memories; add timeouts, error states, disclosure, and privacy boundaries.
+- Compare offline and live responses for character consistency, responsiveness, disagreement, safety, and user understanding.
+- Saria owns the proxy, adapter, privacy, and failure handling; Roxy owns prompt/character QA, consent review, and a five-user comparison.
+
+### Week 4 — Aug. 28–Sep. 3: pilot and hand-off
+
+- Run an eight-user pilot on the complete demo and resolve the top P0/P1 issues.
+- Deliver a demo-ready build, updated research traceability, a clean GitHub hand-off, the final presentation, and a documented next-step decision.
+- Saria owns release QA, evidence instrumentation, the technical hand-off, and the analytics summary; Roxy owns recruitment, synthesis, the final narrative, and product recommendations.
+
+### Explicit scope cuts and fallbacks
+
+- Do not add characters, chapters, real calls/audio, background notifications, community sharing, cloud accounts, a native app, or infinite procedural worlds during these four weeks.
+- If live AI is unstable, unsafe, or late, keep the deterministic offline engine as the demo default and ship the spike separately; it must not block the pilot.
+- If recruitment is slow, prioritise campus and friends-of-friends, then reduce the Week 3 comparison sample before reducing the final pilot.
+- If memory or relationship controls remain confusing, simplify labels and surface source/edit controls before adding more dimensions or visual metrics.
+
+Status: Planned.
+
 ## Follow-up: packaged-background path portability — 2026-08-04
 
 ### Product outcome
@@ -721,3 +763,25 @@ Place the complete EchoLoom project in `Zhguo903/Echoloom` so the prototype, ori
 4. Inspect and merge any existing remote history before a normal, non-forced push.
 
 Status: In progress; local project preparation is complete and GitHub authentication is pending.
+
+## Technical feasibility presentation slide — 2026-08-06
+
+### Product outcome
+
+Create one English presentation slide that explains the technology required to turn the current EchoLoom offline demo into a secure, production-ready relationship product. Match the supplied pale-pink four-card visual style, remain truthful about the current implementation, and omit the prohibited product-building-tool name from all slide content.
+
+### Plan
+
+1. Ground the technology categories in the current architecture and optional live-AI upgrade documentation.
+2. Build a 16:9 PowerPoint slide with four balanced cards for client experience, backend and memory, AI and safety, and build operations.
+3. Add primary-source references in speaker notes and distinguish the current offline prototype from the production path.
+4. Render, visually inspect, and run presentation and repository validation before delivery.
+
+Status: Completed on 2026-08-06.
+
+Validation:
+
+- Generated a one-slide 16:9 PowerPoint and matching PNG preview in the supplied pale-pink four-card style.
+- The slide separates the current offline web prototype from the production mobile and server path, and covers client experience, backend and source-linked memory, AI safety, and build operations.
+- Added internal architecture references and primary technical sources in speaker notes; the prohibited product-building-tool name does not appear in slide content or notes.
+- PowerPoint rendering completed successfully, the slide test reported no overflow, and the repository smoke and schema-v8 engine suites pass.
