@@ -83,6 +83,26 @@
     };
   }
 
+  function mergeLiveScene(saved = {}, base) {
+    const descriptor = saved?.descriptor && typeof saved.descriptor === 'object' ? {
+      location: typeof saved.descriptor.location === 'string' ? saved.descriptor.location.slice(0, 100) : '',
+      time: typeof saved.descriptor.time === 'string' ? saved.descriptor.time.slice(0, 40) : '',
+      weather: typeof saved.descriptor.weather === 'string' ? saved.descriptor.weather.slice(0, 60) : '',
+      mood: typeof saved.descriptor.mood === 'string' ? saved.descriptor.mood.slice(0, 80) : ''
+    } : null;
+    const fingerprint = typeof saved?.fingerprint === 'string' && /^[a-f0-9]{64}$/.test(saved.fingerprint) ? saved.fingerprint : null;
+    const image = fingerprint && saved?.image === `/api/scenes/${fingerprint}.jpg` ? saved.image : null;
+    return {
+      ...base,
+      status: image ? 'ready' : saved?.status === 'fallback' ? 'fallback' : 'idle',
+      fingerprint,
+      image,
+      descriptor,
+      cached: image && saved?.cached === true,
+      requestedAt: typeof saved?.requestedAt === 'string' ? saved.requestedAt : null
+    };
+  }
+
   function mergeJourney(characterId, saved, sourceVersion = SCHEMA_VERSION) {
     const base = data().createJourney(characterId);
     if (!saved || typeof saved !== 'object') return base;
@@ -112,6 +132,7 @@
       })).filter((choice) => choice.text) : [],
       liveExpression: ['neutral', 'gentle', 'concerned', 'distant', 'thoughtful', 'guarded', 'surprised', 'relieved'].includes(saved.liveExpression) ? saved.liveExpression : 'neutral',
       liveEmotion: typeof saved.liveEmotion === 'string' ? saved.liveEmotion.slice(0, 40) : 'neutral',
+      liveScene: mergeLiveScene(saved.liveScene || {}, base.liveScene),
       memories: Array.isArray(saved.memories) ? saved.memories.map((memory, index) => mergeMemory(memory, characterId, index)) : base.memories,
       generatedScenes: Array.isArray(saved.generatedScenes) ? saved.generatedScenes : [],
       storyMessages: Array.isArray(saved.storyMessages) ? saved.storyMessages : base.storyMessages,

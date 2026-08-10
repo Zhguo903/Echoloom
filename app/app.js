@@ -192,6 +192,7 @@
     journey.liveEmotion = event.emotion || 'neutral';
     const appliedFlags = applyLiveStoryRules(result, journey, context);
     const savedMemoryId = saveValidatedLiveMemory(result, journey, context);
+    requestLiveSceneBackground(result, journey, context);
     return {
       provider: 'gemini',
       expression: journey.liveExpression,
@@ -200,6 +201,35 @@
       appliedFlags,
       savedMemoryId
     };
+  }
+
+  function requestLiveSceneBackground(result, journey, context = {}) {
+    const scene = result?.gameEvent?.scene;
+    if (result?.provider !== 'gemini' || scene?.changed !== true || !journey?.liveScene) return;
+    const requestId = `scene-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    journey.liveScene = {
+      status: 'loading', fingerprint: null, image: null,
+      descriptor: { location: scene.location, time: scene.time, weather: scene.weather, mood: scene.mood },
+      cached: false, requestedAt: new Date().toISOString(), requestId
+    };
+    window.EchoApiEngine.generateSceneBackground(scene, {
+      aiMode: state.settings?.aiMode || 'offline',
+      characterId: context.characterId || state.activeCharacterId,
+      language: state.language
+    }).then((background) => {
+      if (journey.liveScene?.requestId !== requestId) return;
+      if (background?.image) {
+        journey.liveScene = {
+          ...journey.liveScene,
+          status: 'ready', fingerprint: background.fingerprint, image: background.image,
+          cached: background.cached === true, requestId: undefined
+        };
+      } else {
+        journey.liveScene = { ...journey.liveScene, status: 'fallback', image: null, fingerprint: null, cached: false, requestId: undefined };
+      }
+      window.EchoStorage.save(state);
+      if (activeJourney() === journey) render();
+    });
   }
 
   function notifyProviderFallback(envelope) {
@@ -237,17 +267,22 @@
     const screen = app.firstElementChild;
     const key = sceneBackgroundKey();
     const assetPath = sceneBackgroundAssets[key];
-    if (!screen || !assetPath) return;
-    const asset = new URL(assetPath, document.baseURI).href;
+    if (!screen) return;
+    const liveScene = activeJourney()?.liveScene;
+    const useLiveScene = ['story', 'chat', 'home'].includes(state.screen) && liveScene?.status === 'ready' && /^\/api\/scenes\/[a-f0-9]{64}\.jpg$/.test(liveScene.image || '');
+    if (!assetPath && !useLiveScene) return;
+    const asset = new URL(useLiveScene ? liveScene.image : assetPath, document.baseURI).href;
 
-    screen.dataset.sceneBackground = key;
+    screen.dataset.sceneBackground = useLiveScene ? 'live-generated' : key;
+    if (useLiveScene) screen.dataset.liveScene = 'ready';
     screen.style.setProperty('--scene-background-image', `url("${asset}")`);
 
     const sceneImage = screen.querySelector([
       ':scope > .vn-background',
       ':scope > .signal-detail-bg',
       '.result-hero > img',
-      '.story-scene > .story-scene-bg'
+      '.story-scene > .story-scene-bg',
+      '.home-hero > .home-hero-bg'
     ].join(', '));
     if (sceneImage) sceneImage.src = asset;
 

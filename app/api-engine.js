@@ -4,7 +4,8 @@
     state: 'idle',
     errorCode: null,
     model: null,
-    updatedAt: null
+    updatedAt: null,
+    scene: { state: 'idle', cached: false, errorCode: null }
   };
 
   const delay = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -130,8 +131,37 @@
     return envelope;
   }
 
+  async function generateSceneBackground(scene, options = {}) {
+    if (options.aiMode !== 'live' || scene?.changed !== true) return { skipped: true, fallback: false };
+    runtime.scene = { state: 'loading', cached: false, errorCode: null };
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 25_000);
+    try {
+      const response = await fetch(new URL('api/scene', document.baseURI), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({ scene, characterId: options.characterId || '', language: options.language === 'en' ? 'en' : 'zh' })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !/^\/api\/scenes\/[a-f0-9]{64}\.jpg$/.test(payload.image || '')) {
+        const error = new Error(payload?.error?.message || `Scene API returned ${response.status}.`);
+        error.code = payload?.error?.code || 'provider_error';
+        throw error;
+      }
+      runtime.scene = { state: 'ready', cached: payload.cached === true, errorCode: null };
+      return { ...payload, fallback: false };
+    } catch (error) {
+      runtime.scene = { state: 'fallback', cached: false, errorCode: error?.name === 'AbortError' ? 'provider_timeout' : (error?.code || 'provider_unavailable') };
+      return { fallback: true, errorCode: runtime.scene.errorCode };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
   window.EchoApiEngine = {
     reply,
+    generateSceneBackground,
     status: () => ({ ...runtime })
   };
 })();

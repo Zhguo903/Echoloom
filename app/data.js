@@ -1025,6 +1025,10 @@
     };
   }
 
+  function createLiveScene() {
+    return { status: 'idle', fingerprint: null, image: null, descriptor: null, cached: false, requestedAt: null };
+  }
+
   function createJourney(characterId) {
     const character = characters[characterId] || characters.qian;
     return {
@@ -1088,6 +1092,7 @@
       liveChoices: [],
       liveExpression: 'neutral',
       liveEmotion: 'neutral',
+      liveScene: createLiveScene(),
       interactionCount: 0
     };
   }

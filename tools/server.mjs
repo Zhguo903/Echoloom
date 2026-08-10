@@ -9,6 +9,7 @@ import { loadConfig, providerStatus } from '../server/config.mjs';
 import { ProviderError } from '../server/gemini.mjs';
 import { readJsonBody, sendJson } from '../server/http.mjs';
 import { RequestValidationError } from '../server/request-validation.mjs';
+import { generateSceneBackground, readSceneBackground, SceneValidationError } from '../server/scene-service.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
@@ -54,6 +55,25 @@ const server = http.createServer(async (request, response) => {
       const payload = await readJsonBody(request);
       return sendJson(response, 200, await createChatEvent(payload, config));
     }
+    if (requestUrl.pathname === '/api/scene') {
+      if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use POST.' } });
+      const payload = await readJsonBody(request);
+      return sendJson(response, 200, await generateSceneBackground(payload, config));
+    }
+    const sceneMatch = requestUrl.pathname.match(/^\/api\/scenes\/([a-f0-9]{64})\.jpg$/);
+    if (sceneMatch) {
+      if (request.method !== 'GET') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use GET.' } });
+      const image = await readSceneBackground(sceneMatch[1], config.sceneCacheDir);
+      if (!image) return sendJson(response, 404, { error: { code: 'scene_not_found', message: 'Scene background not found.' } });
+      response.writeHead(200, {
+        'content-type': 'image/jpeg',
+        'cache-control': 'public, max-age=31536000, immutable',
+        'content-length': image.length,
+        'x-content-type-options': 'nosniff'
+      });
+      response.end(image);
+      return;
+    }
     let filePath = safePath(request.url || '/');
     if (!filePath) throw new Error('Invalid path');
     try {
@@ -72,7 +92,7 @@ const server = http.createServer(async (request, response) => {
     });
     response.end(body);
   } catch (error) {
-    const known = error instanceof ProviderError || error instanceof RequestValidationError || Number.isInteger(error?.status);
+    const known = error instanceof ProviderError || error instanceof RequestValidationError || error instanceof SceneValidationError || Number.isInteger(error?.status);
     const status = known ? (error.status || 400) : 500;
     const code = known ? (error.code || 'invalid_request') : 'internal_error';
     sendJson(response, status, {

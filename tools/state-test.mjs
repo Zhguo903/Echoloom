@@ -125,6 +125,7 @@ assert.equal(data.createJourney('wensheng').openingDecision, null);
 assert.equal(data.createJourney('qian').liveStory.currentChapter, 'character_story_1');
 assert.deepEqual(Object.keys(data.createJourney('qian').liveStory.flags), Array.from(data.liveStoryFlagIds));
 assert.equal(data.createJourney('qian').liveExpression, 'neutral');
+assert.equal(data.createJourney('qian').liveScene.status, 'idle');
 
 const distantTimingState = data.createJourney('qian');
 const closeTimingState = data.createJourney('qian');
@@ -291,6 +292,10 @@ current.campaign.echoLink.conversations.qian.messages.push({ id: 'roundtrip-mess
 current.journeys.qian.liveStory.flags.shared_memory_acknowledged = true;
 current.journeys.qian.liveStory.completedEvents.push({ id: 'quiet-listening', source: 'gemini', at: '2026-08-10T00:00:00.000Z', branchId: 'root' });
 current.journeys.qian.liveChoices = [{ text: '先安静陪伴', intent: 'quiet_company' }];
+current.journeys.qian.liveScene = {
+  status: 'ready', fingerprint: 'b'.repeat(64), image: `/api/scenes/${'b'.repeat(64)}.jpg`,
+  descriptor: { location: 'archive balcony', time: 'evening', weather: 'rain', mood: 'quiet' }, cached: true, requestedAt: '2026-08-10T00:00:00.000Z'
+};
 current.journeys.qian.memories.unshift({
   id: 'live-memory-roundtrip', section: 'aboutUser', text: 'User prefers quiet company when tired.', source: 'Gemini structured event',
   pinned: false, permanent: true, type: 'fact', memoryType: 'preference', importance: 8, emotion: 'tired',
@@ -313,6 +318,9 @@ assert.equal(roundTrip.campaign.weaver.createdWorlds[0].name, '潮汐城');
 assert.equal(roundTrip.journeys.qian.liveStory.flags.shared_memory_acknowledged, true);
 assert.equal(roundTrip.journeys.qian.liveStory.completedEvents[0].id, 'quiet-listening');
 assert.equal(roundTrip.journeys.qian.liveChoices[0].intent, 'quiet_company');
+assert.equal(roundTrip.journeys.qian.liveScene.status, 'ready');
+assert.equal(roundTrip.journeys.qian.liveScene.cached, true);
+assert.equal(roundTrip.journeys.qian.liveScene.descriptor.location, 'archive balcony');
 assert.equal(roundTrip.journeys.qian.memories[0].memoryType, 'preference');
 assert.equal(roundTrip.journeys.qian.memories[0].sourceMessageId, 'cu-source');
 assert.equal(roundTrip.journeys.qian.memories[0].provenance, 'gemini-validated-event');
@@ -355,4 +363,4 @@ assert.match(zhouScene.opening, /周棠/);
 assert.match(wenScene.opening, /闻笙/);
 
 console.log('EchoLoom state and engine test: PASS');
-console.log('Checked schema-v9 live story defaults, five stability threads, monthly rollover without deletion, v8/v7/v6/v5/v4/v3/v2/v1 migration, source-linked live memory round-trip, save/load/reset, mainline and created content, rescue constraints, reply timing, consent boundaries, and character-specific engine behavior.');
+console.log('Checked schema-v9 live story/scene defaults, five stability threads, monthly rollover without deletion, v8/v7/v6/v5/v4/v3/v2/v1 migration, source-linked live memory and cached-scene round-trip, save/load/reset, mainline and created content, rescue constraints, reply timing, consent boundaries, and character-specific engine behavior.');

@@ -16,6 +16,7 @@ const liveEvent = {
 
 let fetchMode = 'success';
 let sentBody = null;
+let sceneCalls = 0;
 const offline = {
   storyReply: () => ({ response: 'offline story', relationshipDelta: { trust: 0 }, behaviourTags: [], playerSignalDelta: {} }),
   chatReply: () => ({ response: 'offline chat', relationshipDelta: { trust: 0 }, behaviourTags: [], playerSignalDelta: {} }),
@@ -29,6 +30,13 @@ const context = vm.createContext({
   Response,
   document: { baseURI: 'http://127.0.0.1:5173/' },
   fetch: async (_url, options) => {
+    if (String(_url).endsWith('/api/scene')) {
+      sceneCalls += 1;
+      const sceneBody = JSON.parse(options.body);
+      assert.equal(sceneBody.characterId, 'qian');
+      assert.equal(sceneBody.scene.changed, true);
+      return new Response(JSON.stringify({ fingerprint: 'a'.repeat(64), image: `/api/scenes/${'a'.repeat(64)}.jpg`, cached: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     sentBody = JSON.parse(options.body);
     if (fetchMode === 'failure') return new Response(JSON.stringify({ error: { code: 'provider_unavailable', message: 'not configured' }, fallback: 'offline' }), { status: 503, headers: { 'content-type': 'application/json' } });
     return new Response(JSON.stringify({ event: liveEvent, meta: { model: 'gemini-test' } }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -63,6 +71,14 @@ assert.equal(sentBody.currentStoryState.currentChapter, 'character_story_1');
 assert.equal(sentBody.currentStoryState.currentScene, 'private_archive');
 assert.equal(sentBody.storyFlags.first_contact_complete, true);
 
+const skippedScene = await api.generateSceneBackground({ changed: false, location: 'archive' }, { aiMode: 'live', characterId: 'qian' });
+assert.equal(skippedScene.skipped, true);
+assert.equal(sceneCalls, 0);
+const liveScene = await api.generateSceneBackground({ changed: true, location: 'archive', time: 'evening', weather: 'rain', mood: 'quiet' }, { aiMode: 'live', characterId: 'qian', language: 'zh' });
+assert.equal(liveScene.cached, true);
+assert.equal(liveScene.image, `/api/scenes/${'a'.repeat(64)}.jpg`);
+assert.equal(sceneCalls, 1);
+
 fetchMode = 'failure';
 const fallbackEnvelope = await api.reply('chatReply', 'still here', engineState, { aiMode: 'live', minimumDelay: 0 });
 assert.equal(fallbackEnvelope.fallback, true);
@@ -70,4 +86,4 @@ assert.equal(fallbackEnvelope.result.response, 'offline chat');
 assert.equal(api.status().state, 'fallback');
 
 console.log('EchoLoom browser provider adapter test: PASS');
-console.log('Checked offline default, localized context, live event mapping, and typed provider fallback.');
+console.log('Checked offline default, localized context, live event mapping, scene-change gating, cached background mapping, and typed provider fallback.');

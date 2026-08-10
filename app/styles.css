@@ -648,6 +648,12 @@ kbd { min-width: 24px; height: 23px; border: 1px solid var(--line-strong); borde
 .home-chat-entry button:first-child { height:42px; border:1px solid var(--line); background:white; border-radius:14px; text-align:left; padding:0 12px; color:#9a9da3; font-size:10.5px; cursor:pointer; }
 
 .chat-screen { background:linear-gradient(to bottom, #f5f0e7, var(--ivory)); }
+.chat-screen[data-live-scene="ready"] {
+  background-image:linear-gradient(rgba(255,253,248,.86),rgba(255,253,248,.94)),var(--scene-background-image);
+  background-position:center;
+  background-size:cover;
+}
+.chat-screen[data-live-scene="ready"] .chat-body { background:linear-gradient(rgba(255,253,248,.36),rgba(255,253,248,.7)); }
 .chat-body { flex:1; min-height:0; overflow-y:auto; padding:13px 14px 14px; scrollbar-width:none; }
 .chat-body::-webkit-scrollbar{display:none;}
 .chat-day-label { text-align:center; font-size:8px; color:var(--muted); margin:5px 0 13px; }
@@ -2892,6 +2898,10 @@ body.reduce-motion .vn-dialogue > i { animation:none !important; transition:none
   --scene-scrim:linear-gradient(180deg,rgba(205,229,255,.2),rgba(96,133,166,.08) 54%,rgba(6,15,26,.18));
   --scene-position:50% 45%;
   --scene-image-filter:brightness(1.5) contrast(.91) saturate(1.08);
+}
+.app-screen[data-scene-background="live-generated"] {
+  --scene-position:50% 50%;
+  --scene-image-filter:brightness(1.08) contrast(.96) saturate(.92);
 }
 
 .prologue-screen[data-scene-background] > .vn-background,

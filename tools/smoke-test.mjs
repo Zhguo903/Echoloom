@@ -18,6 +18,7 @@ const required = [
   'server/chat-service.mjs',
   'server/game-event.mjs',
   'server/gemini.mjs',
+  'server/scene-service.mjs',
   'server/supabase.mjs',
   'supabase/migrations/202608100001_api_foundation.sql',
   'assets/brand/echoloom-lockup.png',
@@ -77,6 +78,12 @@ try {
   });
   const chatPayload = await chatResponse.json();
   if (chatResponse.status !== 503 || chatPayload.fallback !== 'offline') throw new Error('Unconfigured chat API did not return a typed offline fallback.');
+  const sceneResponse = await fetch(`http://127.0.0.1:${port}/api/scene`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ scene: { changed: true, location: 'archive', time: 'evening', weather: 'rain', mood: 'quiet' } })
+  });
+  const scenePayload = await sceneResponse.json();
+  if (sceneResponse.status !== 503 || scenePayload.fallback !== 'offline') throw new Error('Unconfigured scene API did not return a typed packaged-background fallback.');
   const checks = [
     ['/', 'EchoLoom Interactive Demo'],
     ['/app/styles.css', '--slate'],
