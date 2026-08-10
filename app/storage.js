@@ -1,7 +1,7 @@
 (() => {
   const KEY = 'echoloom.demo.v2';
   const LEGACY_KEY = 'echoloom-demo-state-v1';
-  const SCHEMA_VERSION = 8;
+  const SCHEMA_VERSION = 9;
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const data = () => window.ECHOLOOM_DATA;
@@ -48,7 +48,38 @@
       emotionalIntensity: number(memory?.emotionalIntensity, type === 'event' ? 2 : 1),
       private: Boolean(memory?.private),
       obsolete: Boolean(memory?.obsolete),
-      crossWorld: Boolean(memory?.crossWorld)
+      crossWorld: Boolean(memory?.crossWorld),
+      memoryType: ['profile', 'preference', 'relationship', 'emotional'].includes(memory?.memoryType) ? memory.memoryType : null,
+      importance: Math.max(1, Math.min(10, number(memory?.importance, memory?.emotionalIntensity || 5))),
+      emotion: typeof memory?.emotion === 'string' ? memory.emotion.slice(0, 40) : 'neutral',
+      sourceMessageId: typeof memory?.sourceMessageId === 'string' ? memory.sourceMessageId.slice(0, 120) : null,
+      provenance: typeof memory?.provenance === 'string' ? memory.provenance.slice(0, 80) : null
+    };
+  }
+
+  function mergeLiveStory(saved = {}, base) {
+    const flagIds = data().liveStoryFlagIds;
+    const savedFlags = saved?.flags && typeof saved.flags === 'object' ? saved.flags : {};
+    const flags = Object.fromEntries(flagIds.map((id) => [id, savedFlags[id] === true]));
+    const completedEvents = Array.isArray(saved?.completedEvents) ? saved.completedEvents.slice(-40).filter((event) => event && typeof event === 'object').map((event) => ({
+      id: typeof event.id === 'string' ? event.id.slice(0, 80) : 'conversation',
+      source: event.source === 'gemini' ? 'gemini' : 'application',
+      at: typeof event.at === 'string' ? event.at : null,
+      branchId: typeof event.branchId === 'string' ? event.branchId.slice(0, 80) : 'root'
+    })) : [];
+    const pendingUnlocks = Array.isArray(saved?.pendingUnlocks) ? saved.pendingUnlocks.slice(-12).filter((item) => item && typeof item === 'object').map((item) => ({
+      id: typeof item.id === 'string' ? item.id.slice(0, 80) : '',
+      status: 'requires-rule',
+      proposedAt: typeof item.proposedAt === 'string' ? item.proposedAt : null
+    })).filter((item) => item.id) : [];
+    return {
+      ...base,
+      currentChapter: typeof saved?.currentChapter === 'string' ? saved.currentChapter.slice(0, 80) : base.currentChapter,
+      currentScene: typeof saved?.currentScene === 'string' ? saved.currentScene.slice(0, 100) : base.currentScene,
+      flags,
+      completedEvents,
+      pendingUnlocks,
+      lastEvent: completedEvents.at(-1)?.id || null
     };
   }
 
@@ -74,6 +105,13 @@
         ...(saved.communicationPulse || {}),
         channelComfort: { ...base.communicationPulse.channelComfort, ...(saved.communicationPulse?.channelComfort || {}) }
       },
+      liveStory: mergeLiveStory(saved.liveStory || {}, base.liveStory),
+      liveChoices: Array.isArray(saved.liveChoices) ? saved.liveChoices.slice(0, 3).map((choice) => ({
+        text: typeof choice?.text === 'string' ? choice.text.slice(0, 40) : '',
+        intent: typeof choice?.intent === 'string' ? choice.intent.slice(0, 64) : 'respond'
+      })).filter((choice) => choice.text) : [],
+      liveExpression: ['neutral', 'gentle', 'concerned', 'distant', 'thoughtful', 'guarded', 'surprised', 'relieved'].includes(saved.liveExpression) ? saved.liveExpression : 'neutral',
+      liveEmotion: typeof saved.liveEmotion === 'string' ? saved.liveEmotion.slice(0, 40) : 'neutral',
       memories: Array.isArray(saved.memories) ? saved.memories.map((memory, index) => mergeMemory(memory, characterId, index)) : base.memories,
       generatedScenes: Array.isArray(saved.generatedScenes) ? saved.generatedScenes : [],
       storyMessages: Array.isArray(saved.storyMessages) ? saved.storyMessages : base.storyMessages,

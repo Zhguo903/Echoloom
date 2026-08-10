@@ -43,6 +43,7 @@ vm.runInContext(await readFile(path.join(root, 'app/api-engine.js'), 'utf8'), co
 const api = context.window.EchoApiEngine;
 const engineState = {
   language: 'zh', activeCharacterId: 'qian', relationship: { trust: 2 }, campaign: { activeBranchId: 'root', mainline: { chapterIndex: 1, phase: 'briefing' } },
+  liveStory: { currentChapter: 'character_story_1', currentScene: 'private_archive', flags: { first_contact_complete: true } },
   memories: [{ id: 'localized', text: { zh: '用户喜欢雨夜。', en: 'User likes rain.' }, source: { zh: '聊天', en: 'Chat' }, type: 'preference' }],
   chatMessages: [{ role: 'character', text: { zh: '你可以慢慢说。', en: 'Take your time.' } }]
 };
@@ -58,6 +59,9 @@ assert.equal(liveEnvelope.result.relationshipDelta.trust, 1.5);
 assert.equal(liveEnvelope.result.relationshipDelta.romanticAttraction, 0);
 assert.equal(sentBody.memories[0].content, '用户喜欢雨夜。');
 assert.equal(sentBody.recentMessages[0].text, '你可以慢慢说。');
+assert.equal(sentBody.currentStoryState.currentChapter, 'character_story_1');
+assert.equal(sentBody.currentStoryState.currentScene, 'private_archive');
+assert.equal(sentBody.storyFlags.first_contact_complete, true);
 
 fetchMode = 'failure';
 const fallbackEnvelope = await api.reply('chatReply', 'still here', engineState, { aiMode: 'live', minimumDelay: 0 });
@@ -67,4 +71,3 @@ assert.equal(api.status().state, 'fallback');
 
 console.log('EchoLoom browser provider adapter test: PASS');
 console.log('Checked offline default, localized context, live event mapping, and typed provider fallback.');
-

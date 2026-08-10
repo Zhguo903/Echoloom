@@ -1,14 +1,14 @@
-const CACHE = 'echoloom-demo-v53';
+const CACHE = 'echoloom-demo-v54';
 const ASSETS = [
   './',
   './index.html',
   './app/styles.css?v=45',
-  './app/data.js?v=21',
-  './app/storage.js?v=12',
+  './app/data.js?v=22',
+  './app/storage.js?v=13',
   './app/story-engine.js?v=6',
   './app/reply-timing.js?v=2',
-  './app/api-engine.js?v=1',
-  './app/app.js?v=34',
+  './app/api-engine.js?v=2',
+  './app/app.js?v=35',
   './assets/brand/echoloom-lockup.png',
   './assets/brand/echoloom-mark.png',
   './assets/brand/echoloom-app-icon.png',

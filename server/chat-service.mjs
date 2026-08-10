@@ -4,13 +4,7 @@ import { personaFor } from './personas.mjs';
 import { buildNpcPrompt } from './prompt.mjs';
 import { validateChatRequest } from './request-validation.mjs';
 import { createSupabaseRepository } from './supabase.mjs';
-
-const ALLOWED_STORY_FLAGS = Object.freeze([
-  'first_contact_complete',
-  'shared_memory_acknowledged',
-  'repair_conversation_available',
-  'scene_invitation_available'
-]);
+import { ALLOWED_STORY_FLAGS, applyStoryRules } from './story-rules.mjs';
 
 function databasePersona(persona, fallback) {
   if (!persona) return fallback;
@@ -45,7 +39,11 @@ export async function createChatEvent(payload, config, { fetchImpl = fetch } = {
     memories: retrieveMemories(requestData.message, sourceMemories, 6),
     recentMessages: persistedContext?.recentMessages?.length ? persistedContext.recentMessages : requestData.recentMessages
   };
-  const event = await requestGeminiEvent(buildNpcPrompt(context), config.gemini, { fetchImpl, allowedFlags: ALLOWED_STORY_FLAGS });
+  const event = applyStoryRules(
+    await requestGeminiEvent(buildNpcPrompt(context), config.gemini, { fetchImpl, allowedFlags: ALLOWED_STORY_FLAGS }),
+    requestData,
+    context
+  );
 
   let persistence = null;
   if (repository.configured) {
@@ -65,4 +63,3 @@ export async function createChatEvent(payload, config, { fetchImpl = fetch } = {
     }
   };
 }
-

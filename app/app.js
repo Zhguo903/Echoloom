@@ -5,7 +5,7 @@
   const demoShell = document.getElementById('demo-shell');
   const phoneFrame = document.getElementById('phone-frame');
   const importFile = document.getElementById('import-file');
-  const { copy, scenes, characters, characterIds, prologueRoutes, onboardingContent, mainlineContent, weaverContent, createMainline, createWeaverState, syncWeaverQuota, createJourney, createCampaign } = window.ECHOLOOM_DATA;
+  const { copy, scenes, characters, characterIds, prologueRoutes, onboardingContent, mainlineContent, weaverContent, liveStoryFlagIds, createMainline, createWeaverState, syncWeaverQuota, createJourney, createCampaign } = window.ECHOLOOM_DATA;
 
   let state = window.EchoStorage.load();
   let isTyping = false;
@@ -117,17 +117,88 @@
     return '';
   }
 
-  function applyStructuredPresentation(result, journey = activeJourney()) {
+  function applyLiveStoryRules(result, journey, context = {}) {
+    const event = result?.gameEvent;
+    if (!event || !journey?.liveStory) return [];
+    const story = journey.liveStory;
+    const requested = new Set([
+      ...(event.story?.requested_flags || []),
+      ...Object.entries(event.story?.flags || {}).filter(([, value]) => value === true).map(([flag]) => flag)
+    ]);
+    const approved = [];
+    const nextStrain = Number(journey.relationship?.strain || 0) + Number(result.relationshipDelta?.strain || 0);
+    const ruleChecks = {
+      first_contact_complete: ['chat', 'echolink'].includes(context.mode) && Number(journey.interactionCount || 0) >= 1,
+      shared_memory_acknowledged: event.memory?.save === true,
+      repair_conversation_available: result.intent === 'repair' && nextStrain >= 2,
+      scene_invitation_available: event.scene?.changed === true
+    };
+    liveStoryFlagIds.forEach((flag) => {
+      if (requested.has(flag) && ruleChecks[flag]) {
+        story.flags[flag] = true;
+        approved.push(flag);
+      }
+    });
+    const eventId = String(event.story?.event || 'conversation').slice(0, 80);
+    story.completedEvents.push({ id: eventId, source: 'gemini', at: new Date().toISOString(), branchId: context.branchId || state.campaign.activeBranchId || 'root' });
+    story.completedEvents = story.completedEvents.slice(-40);
+    story.lastEvent = eventId;
+    if (event.scene?.changed && event.scene.location) story.currentScene = String(event.scene.location).slice(0, 100);
+    if (event.story?.unlock_event && !story.pendingUnlocks.some((item) => item.id === event.story.unlock_event)) {
+      story.pendingUnlocks.push({ id: event.story.unlock_event, status: 'requires-rule', proposedAt: new Date().toISOString() });
+      story.pendingUnlocks = story.pendingUnlocks.slice(-12);
+    }
+    return approved;
+  }
+
+  function saveValidatedLiveMemory(result, journey, context = {}) {
+    const memory = result?.gameEvent?.memory;
+    if (!memory?.save || Number(memory.importance || 0) < 6 || String(memory.content || '').trim().length < 8) return null;
+    const normalized = String(memory.content).trim().toLowerCase().replace(/\s+/g, ' ');
+    const duplicate = journey.memories.find((item) => localText(item.text).trim().toLowerCase().replace(/\s+/g, ' ') === normalized);
+    if (duplicate) return duplicate.id;
+    const type = ['profile', 'preference'].includes(memory.memory_type) ? 'fact' : 'event';
+    const id = `live-memory-${context.characterId || state.activeCharacterId}-${Date.now()}`;
+    journey.memories.unshift({
+      id,
+      section: Number(memory.importance) >= 9 ? 'pinned' : 'aboutUser',
+      text: String(memory.content).trim().slice(0, 1000),
+      source: langText(`Gemini 结构化事件 · ${context.sourceMessageId || '本次对话'}`, `Gemini structured event · ${context.sourceMessageId || 'this turn'}`),
+      pinned: Number(memory.importance) >= 9,
+      permanent: true,
+      type,
+      memoryType: memory.memory_type,
+      importance: Number(memory.importance),
+      emotion: String(memory.emotion || 'neutral').slice(0, 40),
+      worldId: context.worldId || state.campaign.currentWorldId || 'station',
+      branchId: context.branchId || state.campaign.activeBranchId || 'root',
+      providedBy: 'player',
+      sourceMessageId: context.sourceMessageId || null,
+      provenance: 'gemini-validated-event',
+      confidence: 'self-reported',
+      emotionalIntensity: Math.max(1, Math.min(3, Math.ceil(Number(memory.importance) / 4))),
+      private: false,
+      obsolete: false,
+      crossWorld: false
+    });
+    return id;
+  }
+
+  function applyStructuredPresentation(result, journey = activeJourney(), context = {}) {
     if (!journey || !result?.gameEvent) return {};
     const event = result.gameEvent;
     journey.liveChoices = Array.isArray(event.choices) ? event.choices.slice(0, 3) : [];
     journey.liveExpression = event.expression || 'neutral';
     journey.liveEmotion = event.emotion || 'neutral';
+    const appliedFlags = applyLiveStoryRules(result, journey, context);
+    const savedMemoryId = saveValidatedLiveMemory(result, journey, context);
     return {
       provider: 'gemini',
       expression: journey.liveExpression,
       emotion: journey.liveEmotion,
-      relationshipNote: relationshipShiftNote(result)
+      relationshipNote: relationshipShiftNote(result),
+      appliedFlags,
+      savedMemoryId
     };
   }
 
@@ -672,9 +743,11 @@
     const text = localText(memory.text ?? (memory.textKey ? t(memory.textKey) : ''));
     const source = localText(memory.source || '');
     const typeLabels = { event: ['事件记忆', 'Event'], fact: ['事实记忆', 'Fact'], relationshipJudgement: ['关系判断', 'Relationship judgement'], promiseBoundary: ['承诺与边界', 'Promise & boundary'], reflection: ['反思记忆', 'Reflection'] };
+    const liveTypeLabels = { profile: ['个人档案', 'Profile'], preference: ['偏好', 'Preference'], relationship: ['共同关系', 'Relationship'], emotional: ['情绪披露', 'Emotional disclosure'] };
     const editable = ['fact', 'event', 'promiseBoundary'].includes(memory.type);
-    const typeLabel = langText(...(typeLabels[memory.type] || typeLabels.fact));
-    return `<article class="echo-card ${memory.pinned ? 'pinned' : ''}"><div class="echo-meta"><span>${esc(typeLabel)}</span><span>${esc(memory.worldId || 'station')} · ${esc(memory.branchId || 'root')} · ${esc(memory.confidence || 'medium')}</span></div><div class="echo-card-row"><div><strong>${esc(text)}</strong><small>${esc(source)} · ${esc(memory.permanent ? t('memoryPermanent') : t('memoryTemporary'))}</small></div><div class="echo-actions"><button class="echo-action pin-mark" type="button" data-action="toggle-pin-memory" data-memory-id="${esc(memory.id)}" title="${esc(memory.pinned ? t('unpin') : t('pin'))}">${icon('pin',14)}</button>${editable ? `<button class="echo-action" type="button" data-action="edit-memory" data-memory-id="${esc(memory.id)}" title="${esc(t('edit'))}">${icon('edit',14)}</button>` : ''}<button class="echo-action" type="button" data-action="delete-memory" data-memory-id="${esc(memory.id)}" title="${esc(t('delete'))}">${icon('trash',14)}</button></div></div>${!editable ? `<p class="memory-lock-note">${esc(langText('这是角色的关系判断或反思，不可直接改写。', 'This is a character judgement or reflection and cannot be directly rewritten.'))}</p>` : ''}</article>`;
+    const typeLabel = langText(...(liveTypeLabels[memory.memoryType] || typeLabels[memory.type] || typeLabels.fact));
+    const sourceLink = memory.sourceMessageId ? ` · ${langText('来源消息', 'Source message')} ${memory.sourceMessageId}` : '';
+    return `<article class="echo-card ${memory.pinned ? 'pinned' : ''}"><div class="echo-meta"><span>${esc(typeLabel)}</span><span>${esc(memory.worldId || 'station')} · ${esc(memory.branchId || 'root')} · ${esc(memory.confidence || 'medium')}</span></div><div class="echo-card-row"><div><strong>${esc(text)}</strong><small>${esc(source)}${esc(sourceLink)} · ${esc(memory.permanent ? t('memoryPermanent') : t('memoryTemporary'))}</small></div><div class="echo-actions"><button class="echo-action pin-mark" type="button" data-action="toggle-pin-memory" data-memory-id="${esc(memory.id)}" title="${esc(memory.pinned ? t('unpin') : t('pin'))}">${icon('pin',14)}</button>${editable ? `<button class="echo-action" type="button" data-action="edit-memory" data-memory-id="${esc(memory.id)}" title="${esc(t('edit'))}">${icon('edit',14)}</button>` : ''}<button class="echo-action" type="button" data-action="delete-memory" data-memory-id="${esc(memory.id)}" title="${esc(t('delete'))}">${icon('trash',14)}</button></div></div>${!editable ? `<p class="memory-lock-note">${esc(langText('这是角色的关系判断或反思，不可直接改写。', 'This is a character judgement or reflection and cannot be directly rewritten.'))}</p>` : ''}</article>`;
   }
 
   function renderSettings() {
@@ -1781,13 +1854,17 @@
     const clean = String(text || '').trim();
     const journey = activeJourney();
     if (!clean || !journey || isTyping) return;
+    const characterId = state.activeCharacterId;
+    const branchId = state.campaign.activeBranchId || 'root';
+    const worldId = state.campaign.currentWorldId || 'station';
     recordOpeningDecision(clean, journey);
-    journey.storyMessages.push({ id: `su-${Date.now()}`, role: 'user', text: clean });
+    const userMessageId = `su-${Date.now()}`;
+    journey.storyMessages.push({ id: userMessageId, role: 'user', text: clean });
     isTyping = true;
     render();
     const envelope = await window.EchoApiEngine.reply('storyReply', clean, engineState(), apiOptions({ minimumDelay: 650 }));
     const result = applyDelayedOpeningConsequence(envelope.result, journey);
-    const presentation = applyStructuredPresentation(result, journey);
+    const presentation = applyStructuredPresentation(result, journey, { mode: 'story', sourceMessageId: userMessageId, characterId, branchId, worldId });
     journey.storyMessages.push({ id: `sc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
     journey.storyStep += 1;
     journey.interactionCount += 1;
@@ -1801,6 +1878,9 @@
     const clean = String(text || '').trim();
     const journey = activeJourney();
     if (!clean || !journey || isTyping) return;
+    const characterId = state.activeCharacterId;
+    const branchId = state.campaign.activeBranchId || 'root';
+    const worldId = state.campaign.currentWorldId || 'station';
     const userId = `cu-${Date.now()}`;
     journey.chatMessages.push({ id: userId, role: 'user', text: clean });
     const echoThread = echoLinkState()?.conversations?.[state.activeCharacterId];
@@ -1810,7 +1890,7 @@
     render();
     const envelope = await window.EchoApiEngine.reply('chatReply', clean, engineState(), apiOptions());
     const result = envelope.result;
-    const presentation = applyStructuredPresentation(result, journey);
+    const presentation = applyStructuredPresentation(result, journey, { mode: 'chat', sourceMessageId: userId, characterId, branchId, worldId });
     const replyId = `cc-${Date.now()}`;
     journey.chatMessages.push({ id: replyId, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
     if (echoThread) echoThread.messages.push({ id: `el-${replyId}`, sender: state.activeCharacterId, type: 'text', text: result.response, time: echoTime(), ...presentation });
@@ -1934,7 +2014,8 @@
     state.activeCharacterId = contactId;
     applyPrivateIntent(journey, terminal.privateIntent);
     journey.interactionCount += 1;
-    journey.chatMessages.push({ id: `el-sync-user-${Date.now()}`, role: 'user', text: clean, channel, privateIntent: terminal.privateIntent });
+    const syncedUserMessageId = `el-sync-user-${Date.now()}`;
+    journey.chatMessages.push({ id: syncedUserMessageId, role: 'user', text: clean, channel, privateIntent: terminal.privateIntent });
     const delayed = contactId === 'shenyao' && channel === 'voice';
     if (delayed) {
       thread.messages.push({ id: `el-pending-${Date.now()}`, sender: 'system', type: 'system', text: langText('沈曜正在执行观测任务。语音已送达，预计 17 分钟后可处理；未使用紧急标记。', 'Shen Yao is observing. Voice delivered; estimated response in 17 minutes. Emergency flag not used.'), time: echoTime() });
@@ -1947,7 +2028,7 @@
     scheduleEchoReply(thread, contactId, journey, channel, async () => {
       const envelope = await replyPromise;
       const result = envelope.result;
-      const presentation = applyStructuredPresentation(result, journey);
+      const presentation = applyStructuredPresentation(result, journey, { mode: 'echolink', sourceMessageId: syncedUserMessageId, characterId: contactId, branchId: state.campaign.activeBranchId || 'root', worldId: state.campaign.currentWorldId || 'station' });
       thread.messages.push({ id: `el-r-${Date.now()}`, sender: contactId, type: contactId === 'lichuan' && channel === 'voice' ? 'voice' : 'text', text: result.response, time: echoTime(), ...presentation });
       journey.chatMessages.push({ id: `el-sync-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
       applyEngineResult(result, journey);
@@ -2034,14 +2115,18 @@
     const scene = getActiveScene();
     const journey = activeJourney();
     if (!clean || !scene || !journey || isTyping) return;
+    const characterId = state.activeCharacterId;
+    const branchId = state.campaign.activeBranchId || 'root';
+    const worldId = state.campaign.currentWorldId || 'station';
     scene.messages = scene.messages || [];
-    scene.messages.push({ id: `gu-${Date.now()}`, role: 'user', text: clean });
+    const userMessageId = `gu-${Date.now()}`;
+    scene.messages.push({ id: userMessageId, role: 'user', text: clean });
     updateScene(scene);
     isTyping = true;
     render();
     const envelope = await window.EchoApiEngine.reply('sceneReply', clean, engineState(), apiOptions({ scene, minimumDelay: 650 }));
     const result = envelope.result;
-    const presentation = applyStructuredPresentation(result, journey);
+    const presentation = applyStructuredPresentation(result, journey, { mode: 'scene', sourceMessageId: userMessageId, characterId, branchId, worldId });
     scene.messages.push({ id: `gc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
     applyEngineResult(result, journey);
     journey.interactionCount += 1;

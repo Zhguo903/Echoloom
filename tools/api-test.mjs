@@ -6,6 +6,7 @@ import { loadConfig } from '../server/config.mjs';
 import { validateGameEvent } from '../server/game-event.mjs';
 import { retrieveMemories } from '../server/memory-retrieval.mjs';
 import { validateChatRequest } from '../server/request-validation.mjs';
+import { applyStoryRules } from '../server/story-rules.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rawEvent = {
@@ -32,6 +33,16 @@ assert.equal(event.relationship.tension_delta, -2.5);
 assert.deepEqual(event.story.requested_flags, ['shared_memory_acknowledged']);
 assert.equal(event.memory.save, true);
 assert.equal(event.choices.length, 3);
+
+const ruledEvent = applyStoryRules(structuredClone(event), {
+  mode: 'chat', relationship: { tension: 3 }, storyFlags: {}, currentStoryState: { currentChapter: 'chapter_2', currentScene: 'archive' }
+}, {
+  relationship: { tension: 3 }, currentStoryState: { currentChapter: 'chapter_2', currentScene: 'archive' }
+});
+assert.equal(ruledEvent.story.chapter, 'chapter_2');
+assert.equal(ruledEvent.story.scene, 'archive');
+assert.equal(ruledEvent.story.flags.shared_memory_acknowledged, true);
+assert.equal(ruledEvent.story.flags.first_contact_complete, undefined);
 
 const unimportant = validateGameEvent({ ...rawEvent, memory: { ...rawEvent.memory, importance: 5 } });
 assert.equal(unimportant.memory.save, false);
@@ -77,7 +88,9 @@ assert.equal(result.meta.characterId, 'qian');
 assert.equal(result.meta.persisted, false);
 assert.equal(result.event.dialogue, rawEvent.dialogue);
 assert.equal(result.event.memory.memory_type, 'preference');
+assert.equal(result.event.story.chapter, 'chapter_2');
+assert.equal(result.event.story.scene, 'archive');
+assert.equal(result.event.story.flags.shared_memory_acknowledged, true);
 
 console.log('EchoLoom API boundary test: PASS');
-console.log('Checked request isolation, keyword memory retrieval, structured Gemini parsing, semantic validation, and relationship clamping.');
-
+console.log('Checked request isolation, keyword memory retrieval, structured Gemini parsing, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');

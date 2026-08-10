@@ -33,7 +33,7 @@ const storage = context.window.EchoStorage;
 const engine = context.window.EchoEngine;
 const replyTiming = context.window.EchoReplyTiming;
 
-assert.equal(data.defaultState.version, 8);
+assert.equal(data.defaultState.version, 9);
 assert.equal(data.defaultState.screen, 'splash');
 assert.equal(data.defaultState.onboardingCompleted, false);
 assert.equal(data.defaultState.knownNpcIds.length, 0);
@@ -122,6 +122,9 @@ assert.equal(data.createEchoLink().conversations['group-seven'].participantIds.l
 assert.equal(data.createJourney('qian').communicationPulse.channelComfort.text, 6);
 assert.equal(data.createJourney('zhoutang').routeFlags.length, 0);
 assert.equal(data.createJourney('wensheng').openingDecision, null);
+assert.equal(data.createJourney('qian').liveStory.currentChapter, 'character_story_1');
+assert.deepEqual(Object.keys(data.createJourney('qian').liveStory.flags), Array.from(data.liveStoryFlagIds));
+assert.equal(data.createJourney('qian').liveExpression, 'neutral');
 
 const distantTimingState = data.createJourney('qian');
 const closeTimingState = data.createJourney('qian');
@@ -149,7 +152,7 @@ const v2 = {
   }
 };
 const migratedV2 = storage.importState(JSON.stringify({ schemaVersion: 2, state: v2 }));
-assert.equal(migratedV2.version, 8);
+assert.equal(migratedV2.version, 9);
 assert.equal(migratedV2.journeys.qian.met, true);
 assert.equal(migratedV2.journeys.qian.relationship.intimacy, 3);
 assert.equal(migratedV2.journeys.qian.relationship.romanticAttraction, 2);
@@ -169,7 +172,7 @@ const v3 = {
   archives: []
 };
 const migratedV3 = storage.importState(JSON.stringify({ schemaVersion: 3, state: v3 }));
-assert.equal(migratedV3.version, 8);
+assert.equal(migratedV3.version, 9);
 assert.equal(migratedV3.campaign.echoLink.conversations.lichuan.messages[0].type, 'photo');
 assert.equal(migratedV3.campaign.echoLink.conversations.zhoutang.messages[1].type, 'photo');
 assert.equal(migratedV3.journeys.qian.communicationPulse.pendingReply, false);
@@ -189,7 +192,7 @@ delete v4.campaign.echoLink.conversations.zhoutang;
 delete v4.campaign.echoLink.conversations.wensheng;
 v4.campaign.echoLink.conversations['group-seven'].participantIds = ['player', 'qian', 'shenyao', 'lichuan'];
 const migratedV4 = storage.importState(JSON.stringify({ schemaVersion: 4, state: v4 }));
-assert.equal(migratedV4.version, 8);
+assert.equal(migratedV4.version, 9);
 assert.equal(migratedV4.campaign.echoLink.contacts.zhoutang.characterId, 'zhoutang');
 assert.equal(migratedV4.campaign.echoLink.contacts.wensheng.characterId, 'wensheng');
 assert.equal(migratedV4.campaign.echoLink.conversations['group-seven'].participantIds.length, 6);
@@ -204,7 +207,7 @@ const v5 = {
   archives: []
 };
 const migratedV5 = storage.importState(JSON.stringify({ schemaVersion: 5, state: v5 }));
-assert.equal(migratedV5.version, 8);
+assert.equal(migratedV5.version, 9);
 assert.equal(migratedV5.screen, 'observatory-home');
 assert.equal(Object.hasOwn(migratedV5, 'route'), false);
 assert.equal(migratedV5.onboardingCompleted, true);
@@ -223,7 +226,7 @@ const v6 = {
   archives: []
 };
 const migratedV6 = storage.importState(JSON.stringify({ schemaVersion: 6, state: v6 }));
-assert.equal(migratedV6.version, 8);
+assert.equal(migratedV6.version, 9);
 assert.equal(migratedV6.screen, 'observatory-home');
 assert.equal(migratedV6.campaign.mainline.phase, 'briefing');
 assert.deepEqual(Array.from(migratedV6.campaign.mainline.confirmedAnchorIds), []);
@@ -242,14 +245,29 @@ const v7 = {
   archives: []
 };
 const migratedV7 = storage.importState(JSON.stringify({ schemaVersion: 7, state: v7 }));
-assert.equal(migratedV7.version, 8);
+assert.equal(migratedV7.version, 9);
 assert.equal(migratedV7.campaign.mainline.completed, true);
 assert.equal(migratedV7.campaign.weaver.phase, 'locked');
 assert.equal(migratedV7.campaign.weaver.workshopUnlocked, false);
 assert.equal(migratedV7.campaign.weaver.createdNpcs.length, 0);
 
+const v8 = structuredClone(data.defaultState);
+v8.version = 8;
+v8.settings.aiMode = 'live';
+v8.activeCharacterId = 'qian';
+v8.journeys.qian = data.createJourney('qian');
+delete v8.journeys.qian.liveStory;
+delete v8.journeys.qian.liveChoices;
+delete v8.journeys.qian.liveExpression;
+delete v8.journeys.qian.liveEmotion;
+const migratedV8 = storage.importState(JSON.stringify({ schemaVersion: 8, state: v8 }));
+assert.equal(migratedV8.version, 9);
+assert.equal(migratedV8.settings.aiMode, 'live');
+assert.equal(migratedV8.journeys.qian.liveStory.flags.first_contact_complete, false);
+assert.equal(migratedV8.journeys.qian.liveChoices.length, 0);
+
 const migratedV1 = storage.importState(JSON.stringify({ version: 1, memories: [{ id: 'aren-old' }], language: 'zh' }));
-assert.equal(migratedV1.version, 8);
+assert.equal(migratedV1.version, 9);
 assert.equal(migratedV1.screen, 'title');
 assert.equal(migratedV1.legacyArchive.sourceSchemaVersion, 1);
 assert.deepEqual(Object.keys(migratedV1.journeys), []);
@@ -270,9 +288,18 @@ Object.assign(current.campaign.weaver, {
   createdWorlds: [{ id: 'tutorial-world-tide-city', name: '潮汐城', tutorial: true }]
 });
 current.campaign.echoLink.conversations.qian.messages.push({ id: 'roundtrip-message', sender: 'player', type: 'voice', text: 'hello' });
+current.journeys.qian.liveStory.flags.shared_memory_acknowledged = true;
+current.journeys.qian.liveStory.completedEvents.push({ id: 'quiet-listening', source: 'gemini', at: '2026-08-10T00:00:00.000Z', branchId: 'root' });
+current.journeys.qian.liveChoices = [{ text: '先安静陪伴', intent: 'quiet_company' }];
+current.journeys.qian.memories.unshift({
+  id: 'live-memory-roundtrip', section: 'aboutUser', text: 'User prefers quiet company when tired.', source: 'Gemini structured event',
+  pinned: false, permanent: true, type: 'fact', memoryType: 'preference', importance: 8, emotion: 'tired',
+  worldId: 'station', branchId: 'root', providedBy: 'player', sourceMessageId: 'cu-source', provenance: 'gemini-validated-event',
+  confidence: 'self-reported', emotionalIntensity: 2, private: false, obsolete: false, crossWorld: false
+});
 current.archives.push({ id: 'branch-test', snapshot: { journeys: current.journeys, campaign: current.campaign } });
 const roundTrip = storage.importState(storage.exportState(current));
-assert.equal(roundTrip.version, 8);
+assert.equal(roundTrip.version, 9);
 assert.equal(roundTrip.campaign.firstSignal, 'qian');
 assert.equal(roundTrip.archives.length, 1);
 assert.equal(roundTrip.campaign.echoLink.hasOpened, true);
@@ -283,11 +310,17 @@ assert.equal(roundTrip.campaign.mainline.confirmedAnchorIds.length, 3);
 assert.equal(roundTrip.campaign.weaver.observerLevel, 8);
 assert.equal(roundTrip.campaign.weaver.createdNpcs[0].name, '南星');
 assert.equal(roundTrip.campaign.weaver.createdWorlds[0].name, '潮汐城');
+assert.equal(roundTrip.journeys.qian.liveStory.flags.shared_memory_acknowledged, true);
+assert.equal(roundTrip.journeys.qian.liveStory.completedEvents[0].id, 'quiet-listening');
+assert.equal(roundTrip.journeys.qian.liveChoices[0].intent, 'quiet_company');
+assert.equal(roundTrip.journeys.qian.memories[0].memoryType, 'preference');
+assert.equal(roundTrip.journeys.qian.memories[0].sourceMessageId, 'cu-source');
+assert.equal(roundTrip.journeys.qian.memories[0].provenance, 'gemini-validated-event');
 
 storage.save(current);
 assert.equal(storage.load().campaign.firstSignal, 'qian');
 const resetState = storage.reset();
-assert.equal(resetState.version, 8);
+assert.equal(resetState.version, 9);
 assert.equal(resetState.campaign.firstSignal, null);
 assert.equal(storage.load().campaign.firstSignal, null);
 
@@ -322,4 +355,4 @@ assert.match(zhouScene.opening, /周棠/);
 assert.match(wenScene.opening, /闻笙/);
 
 console.log('EchoLoom state and engine test: PASS');
-console.log('Checked schema-v8 Weaver defaults, five stability threads, monthly rollover without deletion, v7/v6/v5/v4/v3/v2/v1 migration, save/load/reset, round-trip mainline and created content, rescue constraints, reply timing, consent boundaries, and character-specific engine behavior.');
+console.log('Checked schema-v9 live story defaults, five stability threads, monthly rollover without deletion, v8/v7/v6/v5/v4/v3/v2/v1 migration, source-linked live memory round-trip, save/load/reset, mainline and created content, rescue constraints, reply timing, consent boundaries, and character-specific engine behavior.');

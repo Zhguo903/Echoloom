@@ -1012,6 +1012,19 @@
     };
   }
 
+  const liveStoryFlagIds = ['first_contact_complete', 'shared_memory_acknowledged', 'repair_conversation_available', 'scene_invitation_available'];
+
+  function createLiveStory(character) {
+    return {
+      currentChapter: 'character_story_1',
+      currentScene: character.defaultSceneId,
+      flags: Object.fromEntries(liveStoryFlagIds.map((id) => [id, false])),
+      completedEvents: [],
+      pendingUnlocks: [],
+      lastEvent: null
+    };
+  }
+
   function createJourney(characterId) {
     const character = characters[characterId] || characters.qian;
     return {
@@ -1071,6 +1084,10 @@
       scenePrompt: '',
       scenePreview: null,
       activeGeneratedSceneId: null,
+      liveStory: createLiveStory(character),
+      liveChoices: [],
+      liveExpression: 'neutral',
+      liveEmotion: 'neutral',
       interactionCount: 0
     };
   }
@@ -1374,7 +1391,7 @@
   };
 
   const defaultState = {
-    version: 8,
+    version: 9,
     language: 'zh',
     screen: 'splash',
     onboardingStarted: false,
@@ -1409,5 +1426,5 @@
     lastUpdated: null
   };
 
-  window.ECHOLOOM_DATA = { copy, scenes, characters, characterIds: Object.keys(characters), prologueRoutes, onboardingContent, mainlineContent, weaverContent, createMainline, createWeaverState, syncWeaverQuota, quotaPeriodKey, createJourney, createEchoLink, createCampaign, defaultState };
+  window.ECHOLOOM_DATA = { copy, scenes, characters, characterIds: Object.keys(characters), prologueRoutes, onboardingContent, mainlineContent, weaverContent, liveStoryFlagIds, createMainline, createWeaverState, syncWeaverQuota, quotaPeriodKey, createJourney, createEchoLink, createCampaign, defaultState };
 })();

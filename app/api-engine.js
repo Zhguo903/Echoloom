@@ -16,9 +16,10 @@
 
   function storySnapshot(engineState = {}) {
     const mainline = engineState.campaign?.mainline || {};
+    const liveStory = engineState.liveStory || {};
     return {
-      currentChapter: mainline.chapterIndex != null ? `chapter_${Number(mainline.chapterIndex) + 1}` : 'current',
-      currentScene: engineState.activeGeneratedSceneId || engineState.selectedSceneId || 'current',
+      currentChapter: liveStory.currentChapter || (mainline.chapterIndex != null ? `chapter_${Number(mainline.chapterIndex) + 1}` : 'current'),
+      currentScene: liveStory.currentScene || engineState.activeGeneratedSceneId || engineState.selectedSceneId || 'current',
       phase: mainline.phase || '',
       chapterIndex: Number(mainline.chapterIndex || 0),
       completed: Boolean(mainline.completed),
