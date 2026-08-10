@@ -1403,7 +1403,8 @@
     legacyArchive: null,
     settings: {
       frequency: 'normal',
-      reduceMotion: false
+      reduceMotion: false,
+      aiMode: 'offline'
     },
     lastUpdated: null
   };

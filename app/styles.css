@@ -2988,3 +2988,64 @@ body.reduce-motion .vn-dialogue > i { animation:none !important; transition:none
   color:rgba(255,250,240,.9);
   text-shadow:0 2px 14px rgba(2,6,17,.9);
 }
+
+/* Optional live provider feedback — additive to the offline visual system. */
+.provider-status {
+  min-height:28px;
+  margin:7px 12px 5px;
+  padding:5px 9px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  border:1px solid rgba(120,151,135,.22);
+  border-radius:11px;
+  color:#52665c;
+  background:rgba(238,246,241,.88);
+  font-size:7.5px;
+  line-height:1.35;
+}
+.provider-status i { width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:var(--sage); box-shadow:0 0 0 3px rgba(120,151,135,.13); }
+.provider-status.live { color:#596182; border-color:rgba(88,101,128,.24); background:rgba(237,239,249,.9); }
+.provider-status.live i { background:var(--slate); box-shadow:0 0 0 3px rgba(88,101,128,.12); }
+.provider-status.fallback { color:#80684a; border-color:rgba(178,135,77,.26); background:rgba(251,243,227,.92); }
+.provider-status.fallback i { background:var(--champagne-deep); box-shadow:0 0 0 3px rgba(178,135,77,.12); }
+.story-interaction > .provider-status { flex:0 0 auto; margin:0 0 7px; }
+.home-body > .provider-status { margin:0 0 9px; }
+.echo-thread-screen > .provider-status { flex:0 0 auto; margin:5px 12px; }
+.settings-section > .provider-status { margin:0 0 7px; }
+
+.npc-state-label {
+  display:block;
+  margin:0 0 4px;
+  color:var(--sage-deep);
+  font-size:6.8px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.relationship-shift-note {
+  display:block;
+  margin-top:7px;
+  padding-top:6px;
+  border-top:1px solid rgba(120,151,135,.2);
+  color:#61766b;
+  font-size:7px;
+  line-height:1.45;
+}
+.story-history-message .relationship-shift-note { color:#6a756f; }
+.echo-message .relationship-shift-note { color:#756853; border-top-color:rgba(178,135,77,.22); }
+
+.expression-concerned img,
+img.expression-concerned { filter:saturate(.88) contrast(1.03); }
+.expression-guarded img,
+img.expression-guarded,
+.expression-distant img,
+img.expression-distant { filter:saturate(.72) contrast(1.06); }
+.expression-gentle img,
+img.expression-gentle,
+.expression-relieved img,
+img.expression-relieved { filter:saturate(1.04) brightness(1.025); }
+.expression-thoughtful img,
+img.expression-thoughtful { filter:saturate(.9) sepia(.05); }
+
+.settings-section #ai-mode-select { max-width:138px; }
+.chat-screen > .provider-status { flex:0 0 auto; }

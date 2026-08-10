@@ -37,6 +37,7 @@ assert.equal(data.defaultState.version, 8);
 assert.equal(data.defaultState.screen, 'splash');
 assert.equal(data.defaultState.onboardingCompleted, false);
 assert.equal(data.defaultState.knownNpcIds.length, 0);
+assert.equal(data.defaultState.settings.aiMode, 'offline');
 assert.equal(Object.keys(data.onboardingContent.rescues).length, 5);
 assert.equal(data.onboardingContent.prologueChoiceBeat, 3);
 assert.equal(data.onboardingContent.identityBeat, 7);

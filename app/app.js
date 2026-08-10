@@ -71,6 +71,71 @@
   const engineState = () => ({ ...(activeJourney() || {}), language: state.language, activeCharacterId: state.activeCharacterId, campaign: state.campaign });
   const langText = (zh, en) => state.language === 'en' ? en : zh;
 
+  function apiOptions(extra = {}) {
+    return {
+      aiMode: state.settings?.aiMode || 'offline',
+      playerName: state.playerName || '',
+      playerIntent: extra.playerIntent || '',
+      scene: extra.scene || null,
+      minimumDelay: extra.minimumDelay ?? 620
+    };
+  }
+
+  function apiStatus() {
+    return window.EchoApiEngine?.status?.() || { source: 'offline', state: 'ready' };
+  }
+
+  function providerStatusMarkup() {
+    const mode = state.settings?.aiMode || 'offline';
+    const runtime = apiStatus();
+    const live = mode === 'live';
+    const tone = live && runtime.source === 'gemini' ? 'live' : live && runtime.state === 'fallback' ? 'fallback' : 'offline';
+    const label = !live
+      ? langText('离线角色引擎', 'Offline character engine')
+      : runtime.state === 'loading'
+        ? langText('Gemini 正在生成', 'Gemini is generating')
+        : runtime.source === 'gemini'
+          ? langText('Gemini 在线 · 结构化事件', 'Gemini live · structured event')
+          : runtime.state === 'fallback'
+            ? langText('Gemini 不可用 · 已离线继续', 'Gemini unavailable · continued offline')
+            : langText('Gemini 模式 · 自动离线回退', 'Gemini mode · automatic offline fallback');
+    return `<div class="provider-status ${tone}" role="status"><i></i><span>${esc(label)}</span></div>`;
+  }
+
+  function relationshipShiftNote(result) {
+    if (!result?.gameEvent) return '';
+    const delta = result.relationshipDelta || {};
+    if (Number(delta.trust || 0) < 0 || Number(delta.strain || 0) > 0) {
+      return langText('这次回应让彼此更谨慎；关系需要通过后续对话解释，而不会被一个分数定义。', 'This response makes both sides more cautious; later conversation, not a score, will explain the relationship.');
+    }
+    if (Number(delta.romanticAttraction || 0) > 0) {
+      return langText('对方注意到你表达的靠近，但没有替你们定义关系。', 'The character noticed your attempt to move closer without defining the relationship for either of you.');
+    }
+    if (Number(delta.trust || 0) > 0 || Number(delta.intimacy || 0) > 0) {
+      return langText('对方更愿意把这件事与你一起处理；关系仍由共同经历与确认继续发展。', 'The character is more willing to handle this with you; the bond still develops through shared experience and mutual confirmation.');
+    }
+    return '';
+  }
+
+  function applyStructuredPresentation(result, journey = activeJourney()) {
+    if (!journey || !result?.gameEvent) return {};
+    const event = result.gameEvent;
+    journey.liveChoices = Array.isArray(event.choices) ? event.choices.slice(0, 3) : [];
+    journey.liveExpression = event.expression || 'neutral';
+    journey.liveEmotion = event.emotion || 'neutral';
+    return {
+      provider: 'gemini',
+      expression: journey.liveExpression,
+      emotion: journey.liveEmotion,
+      relationshipNote: relationshipShiftNote(result)
+    };
+  }
+
+  function notifyProviderFallback(envelope) {
+    if (!envelope?.fallback) return;
+    toast(langText('Gemini 暂时不可用；本次已用离线角色逻辑继续，关系与记忆仍保存在本地。', 'Gemini is unavailable; this turn continued with the offline character logic and local relationship memory.'));
+  }
+
   function sceneBackgroundKey() {
     const screen = state.screen;
     const mainline = state.campaign?.mainline || {};
@@ -203,16 +268,17 @@
     if (!character || !journey) return renderDiscover();
     const messages = journey.storyMessages || [];
     const conversation = chronologicalStoryView(messages);
-    return `<section class="app-screen story-screen">${statusBar()}<div class="story-scene"><img class="story-scene-bg" src="${esc(character.storyBg)}" alt=""><div class="story-top-actions"><button class="round-icon-button" type="button" data-action="go" data-route="discover" aria-label="${esc(langText('返回角色选择', 'Back to character discovery'))}">${icon('back',18)}</button><button class="round-icon-button" type="button" data-action="go" data-route="settings" aria-label="${esc(t('settings'))}">${icon('settings',17)}</button></div><div class="story-header"><span class="chapter">${esc(t('chapterOne'))} · ${esc(localText(character.relation))}</span><h1>${esc(localText(character.chapterTitle))}</h1><p>${esc(localText(character.chapterSubtitle))}</p></div>${conversation.spotlight ? `<div class="story-dialogue-wrap">${dialogueCard(conversation.spotlight)}</div>` : ''}</div><div class="story-interaction"><div class="story-history" id="story-history">${conversation.history.map(storyHistoryMessage).join('')}${isTyping ? typingMarkup() : ''}</div><div class="story-input-row"><input id="story-input" class="story-input" type="text" maxlength="260" placeholder="${esc(t('whatSay'))}"><button type="button" class="send-button" data-action="story-send" aria-label="${esc(t('send'))}" ${isTyping ? 'disabled' : ''}>${icon('send',18)}</button></div><div class="intent-options">${character.options.map((option, index) => `<button type="button" class="intent-button" data-action="story-option" data-text="${esc(localText(option))}"><span class="intent-icon">${['?', '↔', '…', '◇'][index] || '·'}</span><span>${esc(localText(option))}</span><span class="chev">›</span></button>`).join('')}</div><p class="story-hint">${esc(t('storyInputHint'))}</p>${journey.storyStep >= 2 && !isTyping ? `<button type="button" class="primary-button slate finish-story-button" data-action="finish-chapter">${esc(t('finishChapter'))}</button>` : ''}</div></section>`;
+    const choices = journey.liveChoices?.length ? journey.liveChoices.map((choice) => choice.text) : character.options.map((option) => localText(option));
+    return `<section class="app-screen story-screen" data-expression="${esc(journey.liveExpression || 'neutral')}">${statusBar()}<div class="story-scene"><img class="story-scene-bg" src="${esc(character.storyBg)}" alt=""><div class="story-top-actions"><button class="round-icon-button" type="button" data-action="go" data-route="discover" aria-label="${esc(langText('返回角色选择', 'Back to character discovery'))}">${icon('back',18)}</button><button class="round-icon-button" type="button" data-action="go" data-route="settings" aria-label="${esc(t('settings'))}">${icon('settings',17)}</button></div><div class="story-header"><span class="chapter">${esc(t('chapterOne'))} · ${esc(localText(character.relation))}</span><h1>${esc(localText(character.chapterTitle))}</h1><p>${esc(localText(character.chapterSubtitle))}</p></div>${conversation.spotlight ? `<div class="story-dialogue-wrap">${dialogueCard(conversation.spotlight)}</div>` : ''}</div><div class="story-interaction">${providerStatusMarkup()}<div class="story-history" id="story-history">${conversation.history.map(storyHistoryMessage).join('')}${isTyping ? typingMarkup() : ''}</div><div class="story-input-row"><input id="story-input" class="story-input" type="text" maxlength="260" placeholder="${esc(t('whatSay'))}"><button type="button" class="send-button" data-action="story-send" aria-label="${esc(t('send'))}" ${isTyping ? 'disabled' : ''}>${icon('send',18)}</button></div><div class="intent-options">${choices.map((choice, index) => `<button type="button" class="intent-button" data-action="story-option" data-text="${esc(choice)}"><span class="intent-icon">${['?', '↔', '…', '◇'][index] || '·'}</span><span>${esc(choice)}</span><span class="chev">›</span></button>`).join('')}</div><p class="story-hint">${esc(t('storyInputHint'))}</p>${journey.storyStep >= 2 && !isTyping ? `<button type="button" class="primary-button slate finish-story-button" data-action="finish-chapter">${esc(t('finishChapter'))}</button>` : ''}</div></section>`;
   }
 
   function dialogueCard(message) {
     const character = activeCharacter();
-    return `<div class="dialogue-card"><div class="dialogue-avatar"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="dialogue-copy"><strong>${esc(localText(character.name))}</strong><p>${esc(localText(message.text))}</p>${message.memoryRef ? `<span class="memory-reference">${icon('memory',10)}${esc(t('mentionMemory'))}</span>` : ''}</div></div>`;
+    return `<div class="dialogue-card"><div class="dialogue-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="dialogue-copy"><strong>${esc(localText(character.name))}</strong>${message.provider === 'gemini' ? `<small class="npc-state-label">${esc(langText(`Gemini · ${message.emotion || message.expression || 'neutral'}`, `Gemini · ${message.emotion || message.expression || 'neutral'}`))}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.memoryRef ? `<span class="memory-reference">${icon('memory',10)}${esc(t('mentionMemory'))}</span>` : ''}${message.relationshipNote ? `<span class="relationship-shift-note">${esc(message.relationshipNote)}</span>` : ''}</div></div>`;
   }
 
   function storyHistoryMessage(message) {
-    return `<div class="story-history-message ${message.role === 'user' ? 'user' : 'character'}">${esc(localText(message.text))}</div>`;
+    return `<div class="story-history-message ${message.role === 'user' ? 'user' : 'character'}">${esc(localText(message.text))}${message.relationshipNote ? `<small class="relationship-shift-note">${esc(message.relationshipNote)}</small>` : ''}</div>`;
   }
 
   function typingMarkup() {
@@ -413,7 +479,7 @@
     const system = message.sender === 'system';
     const senderName = self || system ? '' : echoContactName(message.sender);
     const typeLabel = message.type === 'voice' ? `▸ ${langText('语音留言', 'Voice note')}` : message.type === 'photo' ? `▧ ${langText('照片', 'Photo')}` : message.type === 'call' ? `☎ ${langText('通话记录', 'Call record')}` : '';
-    return `<div class="echo-message ${self ? 'self' : system ? 'system' : 'other'}">${thread.type === 'group' && senderName ? `<span class="echo-sender">${esc(senderName)}</span>` : ''}<div>${typeLabel ? `<small>${esc(typeLabel)}</small>` : ''}<p>${esc(localText(message.text))}</p><time>${esc(message.time || '')}</time></div></div>`;
+    return `<div class="echo-message ${self ? 'self' : system ? 'system' : 'other'}">${thread.type === 'group' && senderName ? `<span class="echo-sender">${esc(senderName)}</span>` : ''}<div>${typeLabel ? `<small>${esc(typeLabel)}</small>` : ''}${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.relationshipNote ? `<small class="relationship-shift-note">${esc(message.relationshipNote)}</small>` : ''}<time>${esc(message.time || '')}</time></div></div>`;
   }
 
   function renderEchoTyping(thread) {
@@ -434,7 +500,12 @@
     const subtitle = thread.type === 'group' ? langText(`${thread.participantIds.length} 人 · 谁看见，谁才知道`, `${thread.participantIds.length} members · only recipients know`) : thread.type === 'delayed' ? langText('跨世界延迟未知', 'Cross-world delay unknown') : localText(contact?.status);
     const nightTrain = thread.id === 'lichuan' && terminal.pendingEvents.nightTrain === 'available';
     const pending = echoPendingReplies.has(thread.id);
-    return `<section class="app-screen echolink-screen echo-thread-screen">${statusBar()}<div class="echolink-header thread"><button class="round-icon-button" type="button" data-action="echolink-close-thread" aria-label="Back">${icon('back',18)}</button><div><strong>${esc(echoThreadTitle(thread))}</strong><span>${esc(subtitle)}</span></div>${thread.id === 'shenyao' ? `<button class="round-icon-button" type="button" data-action="echolink-call">${icon('call',16)}</button>` : '<span></span>'}</div><div class="echo-thread-body" id="echo-thread-body">${thread.messages.map((message)=>renderEchoMessage(message,thread)).join('')}${renderEchoTyping(thread)}${nightTrain && !pending ? `<section class="message-event-card"><span>${esc(langText('异步剧情 · 夜间列车', 'Async story · Night Train'))}</span><p>${esc(langText('黎川会根据你的行动继续自己的路线；不回复本身不会降低关系。', 'Li Chuan will continue his route based on your action; silence alone does not lower the bond.'))}</p><div><button type="button" data-action="echolink-invite" data-choice="join">${esc(langText('愿意同行', 'Go together'))}</button><button type="button" data-action="echolink-invite" data-choice="ask">${esc(langText('先问风险', 'Ask about risk'))}</button><button type="button" data-action="echolink-invite" data-choice="alternative">${esc(langText('拒绝并提替代', 'Decline, offer alternative'))}</button></div></section>` : ''}</div><div class="echo-composer"><div class="intent-suggestions"><button type="button" data-action="echolink-suggest" data-intent="friendship">${esc(langText('朋友式关心', 'Friendly care'))}</button><button type="button" data-action="echolink-suggest" data-intent="task">${esc(langText('询问事实与风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-suggest" data-intent="uncertain">${esc(langText('暂时不确定', 'Still uncertain'))}</button></div><label class="private-intent"><span>${esc(langText('主控真实意图 · NPC 不直接看到', 'Player intent · not directly shown to NPC'))}</span><select id="echo-private-intent"><option value="friendship" ${terminal.privateIntent === 'friendship' ? 'selected' : ''}>${esc(langText('朋友式关心', 'Friendship'))}</option><option value="hidden-romance" ${terminal.privateIntent === 'hidden-romance' ? 'selected' : ''}>${esc(langText('隐藏好感', 'Hidden romantic interest'))}</option><option value="uncertain" ${terminal.privateIntent === 'uncertain' ? 'selected' : ''}>${esc(langText('自己也不确定', 'Uncertain'))}</option><option value="task" ${terminal.privateIntent === 'task' ? 'selected' : ''}>${esc(langText('任务合作', 'Task cooperation'))}</option></select></label><div class="channel-switch">${availableChannels.map((channel)=>`<button type="button" class="${terminal.composerChannel === channel ? 'active' : ''}" data-action="echolink-channel" data-channel="${channel}">${channel === 'voice' ? icon('mic',14) : channel === 'photo' ? icon('image',14) : icon('message',14)}${esc(echoChannelLabel(channel))}</button>`).join('')}</div><div class="echo-input-row"><input id="echo-message-input" maxlength="300" ${pending ? 'disabled' : ''} placeholder="${esc(pending ? langText('对方正在输入…', 'Waiting for reply…') : langText('自由输入；建议只表达意图', 'Write freely; suggestions express intent only'))}"><button type="button" data-action="echolink-send" aria-label="${esc(t('send'))}" ${pending ? 'disabled' : ''}>${icon('send',17)}</button></div><button class="silence-button" type="button" data-action="echolink-silence" ${pending ? 'disabled' : ''}>${esc(langText('保持沉默／稍后回复', 'Stay silent / reply later'))}</button></div></section>`;
+    const journey = state.journeys?.[contactId];
+    const liveChoices = thread.type === 'private' && journey?.liveChoices?.length ? journey.liveChoices : null;
+    const intentSuggestions = liveChoices
+      ? liveChoices.map((choice) => `<button type="button" data-action="echolink-live-choice" data-text="${esc(choice.text)}">${esc(choice.text)}</button>`).join('')
+      : `<button type="button" data-action="echolink-suggest" data-intent="friendship">${esc(langText('朋友式关心', 'Friendly care'))}</button><button type="button" data-action="echolink-suggest" data-intent="task">${esc(langText('询问事实与风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-suggest" data-intent="uncertain">${esc(langText('暂时不确定', 'Still uncertain'))}</button>`;
+    return `<section class="app-screen echolink-screen echo-thread-screen" data-expression="${esc(journey?.liveExpression || 'neutral')}">${statusBar()}<div class="echolink-header thread"><button class="round-icon-button" type="button" data-action="echolink-close-thread" aria-label="Back">${icon('back',18)}</button><div><strong>${esc(echoThreadTitle(thread))}</strong><span>${esc(subtitle)}</span></div>${thread.id === 'shenyao' ? `<button class="round-icon-button" type="button" data-action="echolink-call">${icon('call',16)}</button>` : '<span></span>'}</div>${thread.type === 'private' ? providerStatusMarkup() : ''}<div class="echo-thread-body" id="echo-thread-body">${thread.messages.map((message)=>renderEchoMessage(message,thread)).join('')}${renderEchoTyping(thread)}${nightTrain && !pending ? `<section class="message-event-card"><span>${esc(langText('异步剧情 · 夜间列车', 'Async story · Night Train'))}</span><p>${esc(langText('黎川会根据你的行动继续自己的路线；不回复本身不会降低关系。', 'Li Chuan will continue his route based on your action; silence alone does not lower the bond.'))}</p><div><button type="button" data-action="echolink-invite" data-choice="join">${esc(langText('愿意同行', 'Go together'))}</button><button type="button" data-action="echolink-invite" data-choice="ask">${esc(langText('先问风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-invite" data-choice="alternative">${esc(langText('拒绝并提替代', 'Decline, offer alternative'))}</button></div></section>` : ''}</div><div class="echo-composer"><div class="intent-suggestions">${intentSuggestions}</div><label class="private-intent"><span>${esc(langText('主控真实意图 · NPC 不直接看到', 'Player intent · not directly shown to NPC'))}</span><select id="echo-private-intent"><option value="friendship" ${terminal.privateIntent === 'friendship' ? 'selected' : ''}>${esc(langText('朋友式关心', 'Friendship'))}</option><option value="hidden-romance" ${terminal.privateIntent === 'hidden-romance' ? 'selected' : ''}>${esc(langText('隐藏好感', 'Hidden romantic interest'))}</option><option value="uncertain" ${terminal.privateIntent === 'uncertain' ? 'selected' : ''}>${esc(langText('自己也不确定', 'Uncertain'))}</option><option value="task" ${terminal.privateIntent === 'task' ? 'selected' : ''}>${esc(langText('任务合作', 'Task cooperation'))}</option></select></label><div class="channel-switch">${availableChannels.map((channel)=>`<button type="button" class="${terminal.composerChannel === channel ? 'active' : ''}" data-action="echolink-channel" data-channel="${channel}">${channel === 'voice' ? icon('mic',14) : channel === 'photo' ? icon('image',14) : icon('message',14)}${esc(echoChannelLabel(channel))}</button>`).join('')}</div><div class="echo-input-row"><input id="echo-message-input" maxlength="300" ${pending ? 'disabled' : ''} placeholder="${esc(pending ? langText('对方正在输入…', 'Waiting for reply…') : langText('自由输入；建议只表达意图', 'Write freely; suggestions express intent only'))}"><button type="button" data-action="echolink-send" aria-label="${esc(t('send'))}" ${pending ? 'disabled' : ''}>${icon('send',17)}</button></div><button class="silence-button" type="button" data-action="echolink-silence" ${pending ? 'disabled' : ''}>${esc(langText('保持沉默／稍后回复', 'Stay silent / reply later'))}</button></div></section>`;
   }
 
   function renderRelationship() {
@@ -513,25 +584,25 @@
   function renderHome() {
     const character = activeCharacter();
     if (!character) return renderDiscover();
-    return `<section class="app-screen home-screen">${statusBar()}<div class="home-hero"><img class="home-hero-bg" src="${esc(character.homeBg)}" alt=""><div class="home-header"><div class="home-name"><h1>${esc(localText(character.name))}</h1><p>${esc(localText(character.role))}</p></div><button class="round-icon-button" type="button" data-action="go" data-route="settings" aria-label="${esc(t('settings'))}">${icon('settings',17)}</button></div><img class="home-character character-full-${esc(character.id)}" src="${esc(character.portrait)}" alt="${esc(localText(character.name))}"><div class="home-status-pill"><strong>${esc(localText(character.homeStatus))}</strong><span>${esc(localText(character.homeSubStatus))}</span></div></div><div class="home-body"><button class="action-card" type="button" data-action="go" data-route="chat"><span class="action-icon">${icon('message',18)}</span><span class="action-copy"><strong>${esc(localText(character.actionTitle))}</strong><span>${esc(localText(character.activeEvent))}</span></span><img class="action-thumb" src="${esc(character.storyBg)}" alt=""></button><button class="action-card" type="button" data-action="go" data-route="relationship"><span class="action-icon">${icon('people',18)}</span><span class="action-copy"><strong>${esc(langText('关系与知情范围', 'Relationship & knowledge'))}</strong><span>${esc(relationshipLabel())} · ${esc(langText('不显示好感分', 'No affection score'))}</span></span><img class="action-thumb brand-thumb" src="assets/brand/echoloom-mark.png" alt=""></button><button class="action-card" type="button" data-action="go" data-route="together"><span class="action-icon">${icon('together',18)}</span><span class="action-copy"><strong>${esc(t('inviteTogether'))}</strong><span>${esc(t('sceneSubheading'))}</span></span><img class="action-thumb" src="${esc(character.homeBg)}" alt=""></button><div class="life-card"><div class="life-card-label"><span>✦</span><span>${esc(t('currentLife'))}</span></div><p>${esc(localText(character.lifeNote))}</p></div><div class="home-chat-entry"><button type="button" data-action="go" data-route="chat">${esc(langText(`跟${localText(character.name)}说点什么…`, `Say something to ${localText(character.name)}…`))}</button><button type="button" class="send-button" data-action="go" data-route="chat" aria-label="${esc(langText('打开聊天', 'Open chat'))}">${icon('send',18)}</button></div></div>${bottomNav('station')}</section>`;
+    return `<section class="app-screen home-screen" data-expression="${esc(activeJourney()?.liveExpression || 'neutral')}">${statusBar()}<div class="home-hero"><img class="home-hero-bg" src="${esc(character.homeBg)}" alt=""><div class="home-header"><div class="home-name"><h1>${esc(localText(character.name))}</h1><p>${esc(localText(character.role))}</p></div><button class="round-icon-button" type="button" data-action="go" data-route="settings" aria-label="${esc(t('settings'))}">${icon('settings',17)}</button></div><img class="home-character character-full-${esc(character.id)} expression-${esc(activeJourney()?.liveExpression || 'neutral')}" src="${esc(character.portrait)}" alt="${esc(localText(character.name))}"><div class="home-status-pill"><strong>${esc(localText(character.homeStatus))}</strong><span>${esc(localText(character.homeSubStatus))}</span></div></div><div class="home-body">${providerStatusMarkup()}<button class="action-card" type="button" data-action="go" data-route="chat"><span class="action-icon">${icon('message',18)}</span><span class="action-copy"><strong>${esc(localText(character.actionTitle))}</strong><span>${esc(localText(character.activeEvent))}</span></span><img class="action-thumb" src="${esc(character.storyBg)}" alt=""></button><button class="action-card" type="button" data-action="go" data-route="relationship"><span class="action-icon">${icon('people',18)}</span><span class="action-copy"><strong>${esc(langText('关系与知情范围', 'Relationship & knowledge'))}</strong><span>${esc(relationshipLabel())} · ${esc(langText('不显示好感分', 'No affection score'))}</span></span><img class="action-thumb brand-thumb" src="assets/brand/echoloom-mark.png" alt=""></button><button class="action-card" type="button" data-action="go" data-route="together"><span class="action-icon">${icon('together',18)}</span><span class="action-copy"><strong>${esc(t('inviteTogether'))}</strong><span>${esc(t('sceneSubheading'))}</span></span><img class="action-thumb" src="${esc(character.homeBg)}" alt=""></button><div class="life-card"><div class="life-card-label"><span>✦</span><span>${esc(t('currentLife'))}</span></div><p>${esc(localText(character.lifeNote))}</p></div><div class="home-chat-entry"><button type="button" data-action="go" data-route="chat">${esc(langText(`跟${localText(character.name)}说点什么…`, `Say something to ${localText(character.name)}…`))}</button><button type="button" class="send-button" data-action="go" data-route="chat" aria-label="${esc(langText('打开聊天', 'Open chat'))}">${icon('send',18)}</button></div></div>${bottomNav('station')}</section>`;
   }
 
   function renderChat() {
     const character = activeCharacter();
     const journey = activeJourney();
     if (!character || !journey) return renderDiscover();
-    const quickPrompts = [
+    const quickPrompts = journey.liveChoices?.length ? journey.liveChoices.map((choice) => choice.text) : [
       langText('问问今天的工作或旅程', 'Ask about today’s work or journey'),
       langText('继续讨论上次的分歧', 'Continue the previous disagreement'),
       langText('告诉对方我今天很累，只想被听见', 'Say I am tired and only want to be heard')
     ];
-    return `<section class="app-screen chat-screen">${topBar(langText(`和${localText(character.name)}的对话`, `Chat with ${localText(character.name)}`), localText(character.relation), 'home')}<div class="chat-body" id="chat-body"><div class="chat-day-label">${langText('今天 · 独立关系时间线已同步', 'Today · independent relationship timeline active')}</div>${journey.chatMessages.map(chatMessage).join('')}${isTyping ? typingMarkup() : ''}</div><div class="quick-prompts">${quickPrompts.map((prompt) => `<button class="quick-prompt" type="button" data-action="chat-quick" data-text="${esc(prompt)}">${esc(prompt)}</button>`).join('')}</div><div class="chat-composer"><input id="chat-input" class="chat-input" type="text" maxlength="300" placeholder="${esc(langText(`跟${localText(character.name)}说点什么…`, `Say something to ${localText(character.name)}…`))}"><button type="button" class="send-button" data-action="chat-send" aria-label="${esc(t('send'))}" ${isTyping ? 'disabled' : ''}>${icon('send',18)}</button></div></section>`;
+    return `<section class="app-screen chat-screen" data-expression="${esc(journey.liveExpression || 'neutral')}">${topBar(langText(`和${localText(character.name)}的对话`, `Chat with ${localText(character.name)}`), localText(character.relation), 'home')}${providerStatusMarkup()}<div class="chat-body" id="chat-body"><div class="chat-day-label">${langText('今天 · 独立关系时间线已同步', 'Today · independent relationship timeline active')}</div>${journey.chatMessages.map(chatMessage).join('')}${isTyping ? typingMarkup() : ''}</div><div class="quick-prompts">${quickPrompts.map((prompt) => `<button class="quick-prompt" type="button" data-action="chat-quick" data-text="${esc(prompt)}">${esc(prompt)}</button>`).join('')}</div><div class="chat-composer"><input id="chat-input" class="chat-input" type="text" maxlength="300" placeholder="${esc(langText(`跟${localText(character.name)}说点什么…`, `Say something to ${localText(character.name)}…`))}"><button type="button" class="send-button" data-action="chat-send" aria-label="${esc(t('send'))}" ${isTyping ? 'disabled' : ''}>${icon('send',18)}</button></div></section>`;
   }
 
   function chatMessage(message) {
     if (message.role === 'user') return `<div class="chat-message-row user"><div class="chat-bubble">${esc(localText(message.text))}</div></div>`;
     const character = activeCharacter();
-    return `<div class="chat-message-row character"><div class="chat-mini-avatar"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="chat-bubble">${esc(localText(message.text))}${message.memoryRef ? `<div class="chat-memory-ref">${icon('memory',10)}<span>${esc(t('mentionMemory'))}</span></div>` : ''}<div class="message-actions"><button class="message-action" type="button" data-action="save-message-memory" data-message-id="${esc(message.id)}">${esc(t('saveEcho'))}</button></div></div></div>`;
+    return `<div class="chat-message-row character"><div class="chat-mini-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="chat-bubble">${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}${esc(localText(message.text))}${message.memoryRef ? `<div class="chat-memory-ref">${icon('memory',10)}<span>${esc(t('mentionMemory'))}</span></div>` : ''}${message.relationshipNote ? `<div class="relationship-shift-note">${esc(message.relationshipNote)}</div>` : ''}<div class="message-actions"><button class="message-action" type="button" data-action="save-message-memory" data-message-id="${esc(message.id)}">${esc(t('saveEcho'))}</button></div></div></div>`;
   }
 
   function renderThreads() {
@@ -609,7 +680,7 @@
   function renderSettings() {
     const backRoute = state.resumeScreen && state.resumeScreen !== 'settings' ? state.resumeScreen : (state.onboardingCompleted ? 'observatory-home' : 'title');
     const known = characterIds.filter((id) => state.journeys?.[id]?.met).map((id) => localText(characters[id].name)).join(' · ');
-    return `<section class="app-screen settings-screen">${topBar(t('settings'), '', backRoute, 'none')}<div class="settings-content"><section class="settings-section"><h2>${esc(t('language'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('language'))}</strong><span>English / 中文</span></div><select id="language-select"><option value="zh" ${state.language === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div></section><section class="settings-section"><h2>${esc(t('notificationFrequency'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('notificationFrequency'))}</strong><span>${esc(t(state.settings.frequency))}</span></div><select id="frequency-select"><option value="gentle" ${state.settings.frequency === 'gentle' ? 'selected' : ''}>${esc(t('gentle'))}</option><option value="normal" ${state.settings.frequency === 'normal' ? 'selected' : ''}>${esc(t('normal'))}</option><option value="quiet" ${state.settings.frequency === 'quiet' ? 'selected' : ''}>${esc(t('quiet'))}</option></select></div><div class="setting-row"><div class="setting-copy"><strong>${esc(t('reduceMotion'))}</strong><span>${esc(langText('减少页面切换与装饰动画。', 'Use fewer transitions and animations.'))}</span></div><button class="toggle ${state.settings.reduceMotion ? 'on' : ''}" type="button" data-action="toggle-motion" aria-pressed="${state.settings.reduceMotion}"><span></span></button></div></section><section class="settings-section"><h2>${esc(langText('故事流程', 'Story flow'))}</h2><div class="data-note">${esc(known ? langText(`当前已认识：${known}`, `Currently known: ${known}`) : langText('尚未完成首次相遇。', 'The first encounter is not complete.'))}</div><button class="secondary-button settings-button" type="button" data-action="restart-onboarding">${esc(langText('重新开始新手剧情', 'Restart onboarding'))}</button><button class="secondary-button settings-button" type="button" data-action="return-title">${esc(langText('返回标题页', 'Return to title'))}</button></section><section class="settings-section"><h2>${esc(langText('关系与分支数据', 'Relationship and branch data'))}</h2><div class="data-note">${esc(t('dataLocal'))}</div><button class="secondary-button settings-button" type="button" data-action="export">${icon('download',14)} ${esc(t('export'))}</button><label class="secondary-button settings-button" for="import-file" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">${icon('upload',14)} ${esc(t('import'))}</label><button class="settings-button danger" type="button" data-action="clear-archive">${esc(langText('清除分支档案', 'Clear branch archive'))}</button><button class="settings-button danger" type="button" data-action="reset">${esc(t('reset'))}</button>${state.legacyArchive ? `<p class="legacy-note">${esc(t('archivedLegacy'))}</p>` : ''}</section></div></section>`;
+    return `<section class="app-screen settings-screen">${topBar(t('settings'), '', backRoute, 'none')}<div class="settings-content"><section class="settings-section"><h2>${esc(t('language'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('language'))}</strong><span>English / 中文</span></div><select id="language-select"><option value="zh" ${state.language === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div></section><section class="settings-section"><h2>${esc(langText('角色生成方式', 'Character response provider'))}</h2>${providerStatusMarkup()}<div class="setting-row"><div class="setting-copy"><strong>${esc(langText('对话引擎', 'Dialogue engine'))}</strong><span>${esc(langText('在线失败会自动使用离线角色逻辑，不会中断故事。', 'Online failures automatically use the offline character logic without interrupting the story.'))}</span></div><select id="ai-mode-select"><option value="offline" ${(state.settings.aiMode || 'offline') === 'offline' ? 'selected' : ''}>${esc(langText('离线演绎（默认）', 'Offline simulation (default)'))}</option><option value="live" ${state.settings.aiMode === 'live' ? 'selected' : ''}>${esc(langText('Gemini 服务端 API', 'Gemini server API'))}</option></select></div><div class="data-note">${esc(langText('在线模式只在通过 npm start 打开的页面中可用。角色上下文按人物隔离；API 密钥不会进入浏览器。', 'Live mode is available only through npm start. Character context is isolated per person and API keys never enter the browser.'))}</div></section><section class="settings-section"><h2>${esc(t('notificationFrequency'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('notificationFrequency'))}</strong><span>${esc(t(state.settings.frequency))}</span></div><select id="frequency-select"><option value="gentle" ${state.settings.frequency === 'gentle' ? 'selected' : ''}>${esc(t('gentle'))}</option><option value="normal" ${state.settings.frequency === 'normal' ? 'selected' : ''}>${esc(t('normal'))}</option><option value="quiet" ${state.settings.frequency === 'quiet' ? 'selected' : ''}>${esc(t('quiet'))}</option></select></div><div class="setting-row"><div class="setting-copy"><strong>${esc(t('reduceMotion'))}</strong><span>${esc(langText('减少页面切换与装饰动画。', 'Use fewer transitions and animations.'))}</span></div><button class="toggle ${state.settings.reduceMotion ? 'on' : ''}" type="button" data-action="toggle-motion" aria-pressed="${state.settings.reduceMotion}"><span></span></button></div></section><section class="settings-section"><h2>${esc(langText('故事流程', 'Story flow'))}</h2><div class="data-note">${esc(known ? langText(`当前已认识：${known}`, `Currently known: ${known}`) : langText('尚未完成首次相遇。', 'The first encounter is not complete.'))}</div><button class="secondary-button settings-button" type="button" data-action="restart-onboarding">${esc(langText('重新开始新手剧情', 'Restart onboarding'))}</button><button class="secondary-button settings-button" type="button" data-action="return-title">${esc(langText('返回标题页', 'Return to title'))}</button></section><section class="settings-section"><h2>${esc(langText('关系与分支数据', 'Relationship and branch data'))}</h2><div class="data-note">${esc(t('dataLocal'))}</div><button class="secondary-button settings-button" type="button" data-action="export">${icon('download',14)} ${esc(t('export'))}</button><label class="secondary-button settings-button" for="import-file" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">${icon('upload',14)} ${esc(t('import'))}</label><button class="settings-button danger" type="button" data-action="clear-archive">${esc(langText('清除分支档案', 'Clear branch archive'))}</button><button class="settings-button danger" type="button" data-action="reset">${esc(t('reset'))}</button>${state.legacyArchive ? `<p class="legacy-note">${esc(t('archivedLegacy'))}</p>` : ''}</section></div></section>`;
   }
 
   function renderBrandSplash() {
@@ -1039,8 +1110,15 @@
     document.getElementById('export-control-label').textContent = t('export');
     document.getElementById('import-control-label').textContent = t('import');
     document.getElementById('reset-control-label').textContent = t('reset');
-    document.getElementById('offline-label').textContent = t('demoOffline');
-    document.getElementById('codex-ready-label').textContent = t('codexReady');
+    const runtime = apiStatus();
+    const live = state.settings?.aiMode === 'live';
+    document.getElementById('desktop-demo-badge').textContent = live ? 'Optional Live AI' : 'Offline Prototype';
+    document.getElementById('offline-label').textContent = live
+      ? runtime.source === 'gemini' ? langText('Gemini 在线 · 离线回退已启用', 'Gemini live · offline fallback enabled') : langText('Gemini 可选 · 当前可离线继续', 'Gemini optional · offline continuation ready')
+      : t('demoOffline');
+    document.getElementById('codex-ready-label').textContent = live
+      ? langText('密钥仅在服务端；结构化事件经过校验。', 'Keys stay server-side; structured events are validated.')
+      : t('codexReady');
   }
 
   function go(route) {
@@ -1699,7 +1777,7 @@
     return result;
   }
 
-  function sendStory(text) {
+  async function sendStory(text) {
     const clean = String(text || '').trim();
     const journey = activeJourney();
     if (!clean || !journey || isTyping) return;
@@ -1707,18 +1785,19 @@
     journey.storyMessages.push({ id: `su-${Date.now()}`, role: 'user', text: clean });
     isTyping = true;
     render();
-    window.setTimeout(() => {
-      const result = applyDelayedOpeningConsequence(window.EchoEngine.storyReply(clean, engineState()), journey);
-      journey.storyMessages.push({ id: `sc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef });
-      journey.storyStep += 1;
-      journey.interactionCount += 1;
-      applyEngineResult(result, journey);
-      isTyping = false;
-      render();
-    }, 650);
+    const envelope = await window.EchoApiEngine.reply('storyReply', clean, engineState(), apiOptions({ minimumDelay: 650 }));
+    const result = applyDelayedOpeningConsequence(envelope.result, journey);
+    const presentation = applyStructuredPresentation(result, journey);
+    journey.storyMessages.push({ id: `sc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
+    journey.storyStep += 1;
+    journey.interactionCount += 1;
+    applyEngineResult(result, journey);
+    notifyProviderFallback(envelope);
+    isTyping = false;
+    render();
   }
 
-  function sendChat(text) {
+  async function sendChat(text) {
     const clean = String(text || '').trim();
     const journey = activeJourney();
     if (!clean || !journey || isTyping) return;
@@ -1729,16 +1808,17 @@
     journey.interactionCount += 1;
     isTyping = true;
     render();
-    window.setTimeout(() => {
-      const result = window.EchoEngine.chatReply(clean, engineState());
-      const replyId = `cc-${Date.now()}`;
-      journey.chatMessages.push({ id: replyId, role: 'character', text: result.response, memoryRef: result.memoryRef });
-      if (echoThread) echoThread.messages.push({ id: `el-${replyId}`, sender: state.activeCharacterId, type: 'text', text: result.response, time: echoTime() });
-      applyEngineResult(result, journey);
-      updateCommunicationPulse(journey, result, 'text', true);
-      isTyping = false;
-      render();
-    }, 620);
+    const envelope = await window.EchoApiEngine.reply('chatReply', clean, engineState(), apiOptions());
+    const result = envelope.result;
+    const presentation = applyStructuredPresentation(result, journey);
+    const replyId = `cc-${Date.now()}`;
+    journey.chatMessages.push({ id: replyId, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
+    if (echoThread) echoThread.messages.push({ id: `el-${replyId}`, sender: state.activeCharacterId, type: 'text', text: result.response, time: echoTime(), ...presentation });
+    applyEngineResult(result, journey);
+    updateCommunicationPulse(journey, result, 'text', true);
+    notifyProviderFallback(envelope);
+    isTyping = false;
+    render();
   }
 
   function echoTime() {
@@ -1779,11 +1859,14 @@
     const pending = { token, threadId: thread.id, speakerId, timerId: null };
     echoPendingReplies.set(thread.id, pending);
     render();
-    pending.timerId = window.setTimeout(() => {
+    pending.timerId = window.setTimeout(async () => {
       if (echoPendingReplies.get(thread.id)?.token !== token) return;
-      echoPendingReplies.delete(thread.id);
-      onReply();
-      render();
+      try {
+        await onReply();
+      } finally {
+        if (echoPendingReplies.get(thread.id)?.token === token) echoPendingReplies.delete(thread.id);
+        render();
+      }
     }, echoReplyDelay(speakerId, journey, channel, thread.type));
     return true;
   }
@@ -1852,20 +1935,24 @@
     applyPrivateIntent(journey, terminal.privateIntent);
     journey.interactionCount += 1;
     journey.chatMessages.push({ id: `el-sync-user-${Date.now()}`, role: 'user', text: clean, channel, privateIntent: terminal.privateIntent });
-    const result = window.EchoEngine.chatReply(clean, engineState());
     const delayed = contactId === 'shenyao' && channel === 'voice';
     if (delayed) {
       thread.messages.push({ id: `el-pending-${Date.now()}`, sender: 'system', type: 'system', text: langText('沈曜正在执行观测任务。语音已送达，预计 17 分钟后可处理；未使用紧急标记。', 'Shen Yao is observing. Voice delivered; estimated response in 17 minutes. Emergency flag not used.'), time: echoTime() });
-      updateCommunicationPulse(journey, result, channel, false);
+      updateCommunicationPulse(journey, window.EchoEngine.chatReply(clean, engineState()), channel, false);
       return render();
     }
+    const replyPromise = window.EchoApiEngine.reply('chatReply', clean, engineState(), apiOptions({ playerIntent: terminal.privateIntent, minimumDelay: 0 }));
     journey.communicationPulse.pendingReply = true;
     journey.communicationPulse.lastInteractionAt = new Date().toISOString();
-    scheduleEchoReply(thread, contactId, journey, channel, () => {
-      thread.messages.push({ id: `el-r-${Date.now()}`, sender: contactId, type: contactId === 'lichuan' && channel === 'voice' ? 'voice' : 'text', text: result.response, time: echoTime() });
-      journey.chatMessages.push({ id: `el-sync-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef });
+    scheduleEchoReply(thread, contactId, journey, channel, async () => {
+      const envelope = await replyPromise;
+      const result = envelope.result;
+      const presentation = applyStructuredPresentation(result, journey);
+      thread.messages.push({ id: `el-r-${Date.now()}`, sender: contactId, type: contactId === 'lichuan' && channel === 'voice' ? 'voice' : 'text', text: result.response, time: echoTime(), ...presentation });
+      journey.chatMessages.push({ id: `el-sync-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
       applyEngineResult(result, journey);
       updateCommunicationPulse(journey, result, channel, true);
+      notifyProviderFallback(envelope);
     });
   }
 
@@ -1942,7 +2029,7 @@
     render();
   }
 
-  function sendGeneratedStory(text) {
+  async function sendGeneratedStory(text) {
     const clean = String(text || '').trim();
     const scene = getActiveScene();
     const journey = activeJourney();
@@ -1952,15 +2039,16 @@
     updateScene(scene);
     isTyping = true;
     render();
-    window.setTimeout(() => {
-      const result = window.EchoEngine.sceneReply(clean, scene, engineState());
-      scene.messages.push({ id: `gc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef });
-      applyEngineResult(result, journey);
-      journey.interactionCount += 1;
-      updateScene(scene);
-      isTyping = false;
-      render();
-    }, 650);
+    const envelope = await window.EchoApiEngine.reply('sceneReply', clean, engineState(), apiOptions({ scene, minimumDelay: 650 }));
+    const result = envelope.result;
+    const presentation = applyStructuredPresentation(result, journey);
+    scene.messages.push({ id: `gc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
+    applyEngineResult(result, journey);
+    journey.interactionCount += 1;
+    updateScene(scene);
+    notifyProviderFallback(envelope);
+    isTyping = false;
+    render();
   }
 
   function updateScene(scene) {
@@ -2495,6 +2583,12 @@
       case 'echolink-close-thread': state.campaign.echoLink.activeThreadId = null; render(); break;
       case 'echolink-channel': state.campaign.echoLink.composerChannel = element.dataset.channel; render(); requestAnimationFrame(() => document.getElementById('echo-message-input')?.focus()); break;
       case 'echolink-suggest': state.campaign.echoLink.privateIntent = element.dataset.intent; render(); requestAnimationFrame(() => document.getElementById('echo-message-input')?.focus()); break;
+      case 'echolink-live-choice': {
+        const choice = String(element.dataset.text || '').slice(0, 80);
+        const input = document.getElementById('echo-message-input');
+        if (input) { input.value = choice; input.focus(); }
+        break;
+      }
       case 'echolink-send': sendEchoMessage(); break;
       case 'echolink-silence': keepEchoSilence(); break;
       case 'echolink-invite': resolveNightTrain(element.dataset.choice); break;
@@ -2551,6 +2645,7 @@
   app.addEventListener('change', (event) => {
     if (event.target.id === 'language-select') { state.language = event.target.value; render(); }
     if (event.target.id === 'frequency-select') { state.settings.frequency = event.target.value; render(); }
+    if (event.target.id === 'ai-mode-select') { state.settings.aiMode = event.target.value === 'live' ? 'live' : 'offline'; render(); }
     if (event.target.id === 'echo-private-intent') { state.campaign.echoLink.privateIntent = event.target.value; }
   });
   document.addEventListener('click', (event) => {
