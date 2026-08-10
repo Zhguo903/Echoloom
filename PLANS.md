@@ -25,7 +25,7 @@ Add one deliberately constrained live-AI path to the existing dependency-free pr
 5. Add deterministic scene prompts, Cloudflare FLUX calls only for `scene.changed`, disk caching by prompt fingerprint, and packaged-background fallback.
 6. Update architecture, optional-AI, setup, cache, and testing documentation; run `npm test`; verify direct/offline, live-fallback, export/reset/import, 393 × 852, desktop, and console behaviour.
 
-Status: In progress — Phases 1–5 complete; documentation and final browser acceptance next.
+Status: Complete — all six phases implemented. `npm test` passes; live-provider failure recovers to the offline engine; and 393 × 852 plus 1440 × 1000 browser checks have no horizontal overflow or console errors.
 
 ## Four-week validation plan from the current MVP — 2026-08-07 to 2026-09-03
 

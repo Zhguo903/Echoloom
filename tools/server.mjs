@@ -5,7 +5,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createChatEvent } from '../server/chat-service.mjs';
-import { loadConfig, providerStatus } from '../server/config.mjs';
+import { loadConfig, loadLocalEnvironment, providerStatus } from '../server/config.mjs';
 import { ProviderError } from '../server/gemini.mjs';
 import { readJsonBody, sendJson } from '../server/http.mjs';
 import { RequestValidationError } from '../server/request-validation.mjs';
@@ -16,7 +16,7 @@ const args = new Set(process.argv.slice(2));
 const portArg = process.argv.find((arg) => arg.startsWith('--port='));
 const port = Number(portArg?.split('=')[1] || process.env.PORT || 5173);
 const shouldOpen = args.has('--open') && !args.has('--no-open');
-const config = loadConfig(process.env, root);
+const config = loadConfig(loadLocalEnvironment(root), root);
 
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],

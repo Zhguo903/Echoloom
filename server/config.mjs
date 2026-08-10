@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const clean = (value) => typeof value === 'string' ? value.trim() : '';
 
@@ -22,6 +23,25 @@ function optionalHttpUrl(value) {
 function optionalUuid(value) {
   const candidate = clean(value);
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate) ? candidate : '';
+}
+
+export function parseEnvText(source = '') {
+  const values = {};
+  for (const line of String(source).split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match) continue;
+    let value = match[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    else value = value.replace(/\s+#.*$/, '').trim();
+    values[match[1]] = value;
+  }
+  return values;
+}
+
+export function loadLocalEnvironment(root = process.cwd(), env = process.env) {
+  let fileValues = {};
+  try { fileValues = parseEnvText(readFileSync(path.join(root, '.env'), 'utf8')); } catch {}
+  return { ...fileValues, ...env };
 }
 
 export function loadConfig(env = process.env, root = process.cwd()) {
@@ -65,4 +85,3 @@ export function providerStatus(config) {
     offlineFallback: true
   };
 }
-

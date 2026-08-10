@@ -35,6 +35,31 @@ npm start
 
 也可以直接双击 `index.html`，但通过本地服务器运行时，PWA 缓存和部分浏览器功能更稳定。
 
+## 可选的真实 API 模式
+
+离线 `EchoEngine` 仍是默认模式，不需要账号、网络或 API Key。若要测试真实闭环：
+
+```bash
+cp .env.example .env
+# 只填写需要测试的服务端密钥
+npm start
+```
+
+然后在“设置 → 对话引擎”选择“Gemini 服务端 API”。在线链路为：
+
+```text
+玩家输入 → 当前角色上下文与相关记忆 → Gemini 结构化 Game Event
+        → 服务端校验与规则确认 → 关系/剧情/记忆更新
+        → 仅在 scene.changed 时请求 Cloudflare 背景 → 指纹缓存
+```
+
+- Gemini：生成简短角色回复、表情/情绪、关系方向、剧情提议、场景描述、记忆候选和最多三个意图按钮。
+- Supabase（可选）：按当前角色隔离保存消息、关系、故事状态和四类长期记忆。先执行 `supabase/migrations/202608100001_api_foundation.sql`，再执行 `supabase/seed.sql`。
+- Cloudflare Workers AI（可选）：只为已确认的场景变化生成 FLUX 背景；相同提示词直接读取 `.cache/echoloom-scenes`。
+- 任一服务未配置、超时或失败时，会自动使用原有离线角色逻辑或打包背景，不中断故事。
+
+所有真实密钥只放在被 Git 忽略的 `.env`；浏览器代码不会收到 Gemini、Supabase service role 或 Cloudflare token。完整配置、接口和数据库初始化步骤见 `docs/OPTIONAL_REAL_AI_UPGRADE.md`。
+
 ## 建议的完整体验路径
 
 1. 17 秒停电：点击“回应求救信号”。
@@ -56,7 +81,7 @@ npm start
 
 ## 当前 Demo 的实现范围
 
-- 完整离线运行，不需要 API Key；
+- 默认完整离线运行，不需要 API Key；可选启用服务端 Gemini + Supabase + Cloudflare 闭环；
 - 中英文界面；
 - 响应式手机界面与桌面演示壳；
 - 17 秒停电、五处同时信号与共享的命运观测站主谜团；
@@ -96,7 +121,8 @@ EchoLoom_Interactive_Demo/
 ├── app/
 │   ├── app.js                  # 页面、交互和状态更新
 │   ├── data.js                 # 文案、五角色设定、默认关系与场景数据
-│   ├── storage.js              # schema v8 主线、织界工坊保存、迁移、导入、导出
+│   ├── storage.js              # schema v9 主线、在线事件、织界工坊保存、迁移、导入、导出
+│   ├── api-engine.js           # 可选在线提供方、超时与离线回退适配
 │   ├── story-engine.js         # 离线故事与聊天模拟引擎
 │   └── styles.css              # 完整视觉系统
 ├── assets/                     # 角色与场景 SVG
@@ -105,6 +131,8 @@ EchoLoom_Interactive_Demo/
 │   ├── smoke-test.mjs          # 文件、语法与资源验证
 │   ├── state-test.mjs          # 状态迁移、导入导出与关系引擎验证
 │   └── test.mjs                # 测试入口
+├── server/                     # Gemini、Supabase、场景缓存与服务端规则
+├── supabase/                   # schema/RLS/RPC migration 与五角色 seed
 ├── docs/                       # 产品、研究、设计、技术与真实 AI 升级说明
 ├── .codex/skills/              # 项目专属 Codex Skill
 ├── AGENTS.md                   # Codex 自动读取的项目规则
@@ -119,7 +147,7 @@ EchoLoom_Interactive_Demo/
 npm test
 ```
 
-测试会检查核心文件、JavaScript 语法、服务器资源、schema v8 织界状态、月度额度恢复且不删除已有内容、v7 至 v1 迁移、五角色默认状态、首次救援影响限制、讯息导入导出、关系信号、同意边界和角色敏感度。
+测试会检查核心文件、服务器/API 回退、schema v9 与 v8 至 v1 迁移、结构化事件校验、应用规则控制的剧情标记、可追溯记忆、FLUX 场景触发与缓存复用、导入导出、关系信号、同意边界和角色敏感度。
 
 ## 使用 Codex 修改
 
