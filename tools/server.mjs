@@ -4,12 +4,18 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { createChatEvent } from '../server/chat-service.mjs';
+import { loadConfig, providerStatus } from '../server/config.mjs';
+import { ProviderError } from '../server/gemini.mjs';
+import { readJsonBody, sendJson } from '../server/http.mjs';
+import { RequestValidationError } from '../server/request-validation.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
 const portArg = process.argv.find((arg) => arg.startsWith('--port='));
 const port = Number(portArg?.split('=')[1] || process.env.PORT || 5173);
 const shouldOpen = args.has('--open') && !args.has('--no-open');
+const config = loadConfig(process.env, root);
 
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -34,10 +40,19 @@ function safePath(urlPath) {
 
 const server = http.createServer(async (request, response) => {
   try {
+    const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
     if (request.url === '/api/health') {
-      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      response.end(JSON.stringify({ ok: true, product: 'EchoLoom Interactive Demo' }));
+      sendJson(response, 200, { ok: true, product: 'EchoLoom Interactive Demo' });
       return;
+    }
+    if (requestUrl.pathname === '/api/provider-status') {
+      if (request.method !== 'GET') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use GET.' } });
+      return sendJson(response, 200, providerStatus(config));
+    }
+    if (requestUrl.pathname === '/api/chat') {
+      if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use POST.' } });
+      const payload = await readJsonBody(request);
+      return sendJson(response, 200, await createChatEvent(payload, config));
     }
     let filePath = safePath(request.url || '/');
     if (!filePath) throw new Error('Invalid path');
@@ -57,8 +72,13 @@ const server = http.createServer(async (request, response) => {
     });
     response.end(body);
   } catch (error) {
-    response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
-    response.end(`EchoLoom server error: ${error.message}`);
+    const known = error instanceof ProviderError || error instanceof RequestValidationError || Number.isInteger(error?.status);
+    const status = known ? (error.status || 400) : 500;
+    const code = known ? (error.code || 'invalid_request') : 'internal_error';
+    sendJson(response, status, {
+      error: { code, message: known ? error.message : 'EchoLoom server could not complete the request.' },
+      fallback: code.startsWith('provider_') ? 'offline' : undefined
+    });
   }
 });
 

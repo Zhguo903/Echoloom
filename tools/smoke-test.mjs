@@ -14,6 +14,11 @@ const required = [
   'app/story-engine.js',
   'app/reply-timing.js',
   'app/app.js',
+  'server/chat-service.mjs',
+  'server/game-event.mjs',
+  'server/gemini.mjs',
+  'server/supabase.mjs',
+  'supabase/migrations/202608100001_api_foundation.sql',
   'assets/brand/echoloom-lockup.png',
   'assets/brand/echoloom-mark.png',
   'assets/brand/echoloom-app-icon.png',
@@ -62,6 +67,15 @@ child.stderr.on('data', (chunk) => { stderr += chunk; });
 
 try {
   await waitForServer(`http://127.0.0.1:${port}/api/health`);
+  const providerResponse = await fetch(`http://127.0.0.1:${port}/api/provider-status`);
+  const providerStatus = await providerResponse.json();
+  if (!providerResponse.ok || providerStatus.offlineFallback !== true || providerStatus.gemini.configured !== false) throw new Error('Provider status did not report the offline fallback.');
+  const chatResponse = await fetch(`http://127.0.0.1:${port}/api/chat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ characterId: 'qian', message: 'Test offline fallback.' })
+  });
+  const chatPayload = await chatResponse.json();
+  if (chatResponse.status !== 503 || chatPayload.fallback !== 'offline') throw new Error('Unconfigured chat API did not return a typed offline fallback.');
   const checks = [
     ['/', 'EchoLoom Interactive Demo'],
     ['/app/styles.css', '--slate'],
@@ -104,7 +118,7 @@ try {
     if ((await response.arrayBuffer()).byteLength < minimumBytes) throw new Error(`${url} is unexpectedly small`);
   }
   console.log('EchoLoom smoke test: PASS');
-  console.log(`Checked ${required.length} required files and ${checks.length + pngChecks.length} served resources.`);
+  console.log(`Checked ${required.length} required files and ${checks.length + pngChecks.length + 2} served resources.`);
 } finally {
   child.kill('SIGTERM');
 }
