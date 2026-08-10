@@ -7,6 +7,7 @@ node_modules/
 !.env.example
 coverage/
 dist/
+.cache/
 
 # Generated report previews and extracted assignment pages.
 # Keep the final report in output/report/ and the report source in tmp/report_work/.

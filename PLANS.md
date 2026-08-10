@@ -1,5 +1,32 @@
 # EchoLink MVP Plan
 
+## Optional Gemini + Supabase + Cloudflare API loop — 2026-08-10
+
+### Product outcome
+
+Add one deliberately constrained live-AI path to the existing dependency-free prototype: a selected character can answer through a validated structured Game Event, remember only meaningful user disclosures, advance only rules-approved story flags, and request a cached background only when the scene actually changes. The deterministic `EchoEngine` remains the default and the automatic fallback, so the demo continues to work without accounts, network access, or keys.
+
+### Compatibility and safety decisions
+
+- Preserve the current HTML/CSS/JavaScript UI, navigation, five independent journeys, schema-v8 imports, and the four-method `EchoEngine` contract. Do not migrate to React/Next or add a production dependency.
+- Keep the browser's relationship archive authoritative in offline mode. Supabase synchronization is optional and server-owned; browser code never receives the service role key or model/image credentials.
+- Map the live event's trust, intimacy, and romance directions into the existing eleven-dimensional qualitative model. Do not derive or rename a relationship agreement from a score.
+- Treat model-proposed story changes, memories, choices, expressions, and scene changes as untrusted suggestions. Validate shapes and lengths, clamp deltas, filter allowed flags, and apply database changes only through application rules.
+- Keep free text primary. Model choices must be short intent labels, not complete dialogue written on the player's behalf.
+- Keep memory visible, editable/deletable, source-linked, branch-scoped, and exportable. Save only profile facts, preferences, shared relationship events, and emotionally important disclosures.
+- Do not claim consciousness, add retention mechanics, or send one character's private journey data to another character.
+
+### Implementation plan
+
+1. Add the Supabase migration for users, characters, relationships, chat messages, memories, story states, story choices, worlds, save slots, and cached scene metadata; add RLS and a validated-event RPC boundary.
+2. Add environment parsing, bounded JSON request handling, provider status, Gemini structured-output calls, semantic validation, timeouts, and safe error responses.
+3. Add a browser provider adapter and connect Story, Chat, generated-scene chat, and private EchoLink messages while retaining typing feedback and deterministic fallback.
+4. Add schema-v9 live-event state, rules-approved story flags, four-class meaningful memory conversion, model intent choices, expression state, and backward-compatible import/export tests.
+5. Add deterministic scene prompts, Cloudflare FLUX calls only for `scene.changed`, disk caching by prompt fingerprint, and packaged-background fallback.
+6. Update architecture, optional-AI, setup, cache, and testing documentation; run `npm test`; verify direct/offline, live-fallback, export/reset/import, 393 × 852, desktop, and console behaviour.
+
+Status: In progress — Phase 1.
+
 ## Four-week validation plan from the current MVP — 2026-08-07 to 2026-09-03
 
 ### Current baseline
