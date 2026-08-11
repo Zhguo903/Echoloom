@@ -33,11 +33,11 @@ const storage = context.window.EchoStorage;
 const engine = context.window.EchoEngine;
 const replyTiming = context.window.EchoReplyTiming;
 
-assert.equal(data.defaultState.version, 9);
+assert.equal(data.defaultState.version, 10);
 assert.equal(data.defaultState.screen, 'splash');
 assert.equal(data.defaultState.onboardingCompleted, false);
 assert.equal(data.defaultState.knownNpcIds.length, 0);
-assert.equal(data.defaultState.settings.aiMode, 'offline');
+assert.equal(data.defaultState.settings.aiMode, 'auto');
 assert.equal(Object.keys(data.onboardingContent.rescues).length, 5);
 assert.equal(data.onboardingContent.prologueChoiceBeat, 3);
 assert.equal(data.onboardingContent.identityBeat, 7);
@@ -153,7 +153,7 @@ const v2 = {
   }
 };
 const migratedV2 = storage.importState(JSON.stringify({ schemaVersion: 2, state: v2 }));
-assert.equal(migratedV2.version, 9);
+assert.equal(migratedV2.version, 10);
 assert.equal(migratedV2.journeys.qian.met, true);
 assert.equal(migratedV2.journeys.qian.relationship.intimacy, 3);
 assert.equal(migratedV2.journeys.qian.relationship.romanticAttraction, 2);
@@ -173,7 +173,7 @@ const v3 = {
   archives: []
 };
 const migratedV3 = storage.importState(JSON.stringify({ schemaVersion: 3, state: v3 }));
-assert.equal(migratedV3.version, 9);
+assert.equal(migratedV3.version, 10);
 assert.equal(migratedV3.campaign.echoLink.conversations.lichuan.messages[0].type, 'photo');
 assert.equal(migratedV3.campaign.echoLink.conversations.zhoutang.messages[1].type, 'photo');
 assert.equal(migratedV3.journeys.qian.communicationPulse.pendingReply, false);
@@ -193,7 +193,7 @@ delete v4.campaign.echoLink.conversations.zhoutang;
 delete v4.campaign.echoLink.conversations.wensheng;
 v4.campaign.echoLink.conversations['group-seven'].participantIds = ['player', 'qian', 'shenyao', 'lichuan'];
 const migratedV4 = storage.importState(JSON.stringify({ schemaVersion: 4, state: v4 }));
-assert.equal(migratedV4.version, 9);
+assert.equal(migratedV4.version, 10);
 assert.equal(migratedV4.campaign.echoLink.contacts.zhoutang.characterId, 'zhoutang');
 assert.equal(migratedV4.campaign.echoLink.contacts.wensheng.characterId, 'wensheng');
 assert.equal(migratedV4.campaign.echoLink.conversations['group-seven'].participantIds.length, 6);
@@ -208,7 +208,7 @@ const v5 = {
   archives: []
 };
 const migratedV5 = storage.importState(JSON.stringify({ schemaVersion: 5, state: v5 }));
-assert.equal(migratedV5.version, 9);
+assert.equal(migratedV5.version, 10);
 assert.equal(migratedV5.screen, 'observatory-home');
 assert.equal(Object.hasOwn(migratedV5, 'route'), false);
 assert.equal(migratedV5.onboardingCompleted, true);
@@ -227,7 +227,7 @@ const v6 = {
   archives: []
 };
 const migratedV6 = storage.importState(JSON.stringify({ schemaVersion: 6, state: v6 }));
-assert.equal(migratedV6.version, 9);
+assert.equal(migratedV6.version, 10);
 assert.equal(migratedV6.screen, 'observatory-home');
 assert.equal(migratedV6.campaign.mainline.phase, 'briefing');
 assert.deepEqual(Array.from(migratedV6.campaign.mainline.confirmedAnchorIds), []);
@@ -246,7 +246,7 @@ const v7 = {
   archives: []
 };
 const migratedV7 = storage.importState(JSON.stringify({ schemaVersion: 7, state: v7 }));
-assert.equal(migratedV7.version, 9);
+assert.equal(migratedV7.version, 10);
 assert.equal(migratedV7.campaign.mainline.completed, true);
 assert.equal(migratedV7.campaign.weaver.phase, 'locked');
 assert.equal(migratedV7.campaign.weaver.workshopUnlocked, false);
@@ -262,13 +262,20 @@ delete v8.journeys.qian.liveChoices;
 delete v8.journeys.qian.liveExpression;
 delete v8.journeys.qian.liveEmotion;
 const migratedV8 = storage.importState(JSON.stringify({ schemaVersion: 8, state: v8 }));
-assert.equal(migratedV8.version, 9);
+assert.equal(migratedV8.version, 10);
 assert.equal(migratedV8.settings.aiMode, 'live');
 assert.equal(migratedV8.journeys.qian.liveStory.flags.first_contact_complete, false);
 assert.equal(migratedV8.journeys.qian.liveChoices.length, 0);
 
+const v9 = structuredClone(data.defaultState);
+v9.version = 9;
+v9.settings.aiMode = 'offline';
+const migratedV9 = storage.importState(JSON.stringify({ schemaVersion: 9, state: v9 }));
+assert.equal(migratedV9.version, 10);
+assert.equal(migratedV9.settings.aiMode, 'auto');
+
 const migratedV1 = storage.importState(JSON.stringify({ version: 1, memories: [{ id: 'aren-old' }], language: 'zh' }));
-assert.equal(migratedV1.version, 9);
+assert.equal(migratedV1.version, 10);
 assert.equal(migratedV1.screen, 'title');
 assert.equal(migratedV1.legacyArchive.sourceSchemaVersion, 1);
 assert.deepEqual(Object.keys(migratedV1.journeys), []);
@@ -304,7 +311,7 @@ current.journeys.qian.memories.unshift({
 });
 current.archives.push({ id: 'branch-test', snapshot: { journeys: current.journeys, campaign: current.campaign } });
 const roundTrip = storage.importState(storage.exportState(current));
-assert.equal(roundTrip.version, 9);
+assert.equal(roundTrip.version, 10);
 assert.equal(roundTrip.campaign.firstSignal, 'qian');
 assert.equal(roundTrip.archives.length, 1);
 assert.equal(roundTrip.campaign.echoLink.hasOpened, true);
@@ -328,11 +335,14 @@ assert.equal(roundTrip.journeys.qian.memories[0].provenance, 'gemini-validated-e
 storage.save(current);
 assert.equal(storage.load().campaign.firstSignal, 'qian');
 const resetState = storage.reset();
-assert.equal(resetState.version, 9);
+assert.equal(resetState.version, 10);
 assert.equal(resetState.campaign.firstSignal, null);
 assert.equal(storage.load().campaign.firstSignal, null);
 
 const journey = data.createJourney('qian');
+const clarified = engine.chatReply('？', { ...journey, language: 'zh', activeCharacterId: 'qian' });
+assert.equal(clarified.intent, 'clarify');
+assert.match(clarified.response, /刚才|直接/);
 const romanticSignal = engine.storyReply('我喜欢你', { ...journey, language: 'zh', activeCharacterId: 'qian' });
 assert.equal(romanticSignal.intent, 'flirt');
 assert.equal(romanticSignal.playerSignalDelta.romantic, 1);
@@ -363,4 +373,4 @@ assert.match(zhouScene.opening, /周棠/);
 assert.match(wenScene.opening, /闻笙/);
 
 console.log('EchoLoom state and engine test: PASS');
-console.log('Checked schema-v9 live story/scene defaults, five stability threads, monthly rollover without deletion, v8/v7/v6/v5/v4/v3/v2/v1 migration, source-linked live memory and cached-scene round-trip, save/load/reset, mainline and created content, rescue constraints, reply timing, consent boundaries, and character-specific engine behavior.');
+console.log('Checked schema-v10 automatic provider defaults, five stability threads, monthly rollover without deletion, v9/v8/v7/v6/v5/v4/v3/v2/v1 migration, source-linked live memory and cached-scene round-trip, save/load/reset, clarification fallback, mainline and created content, rescue constraints, reply timing, consent boundaries, and character-specific engine behavior.');

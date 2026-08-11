@@ -45,7 +45,7 @@ cp .env.example .env
 npm start
 ```
 
-然后在“设置 → 对话引擎”选择“Gemini 服务端 API”。在线链路为：
+重新启动后默认的“自动选择”会检测服务端 Key 并启用 Gemini；也可以在“设置 → 对话引擎”选择“始终尝试 Gemini”。在线链路为：
 
 ```text
 玩家输入 → 当前角色上下文与相关记忆 → Gemini 结构化 Game Event
@@ -121,7 +121,7 @@ EchoLoom_Interactive_Demo/
 ├── app/
 │   ├── app.js                  # 页面、交互和状态更新
 │   ├── data.js                 # 文案、五角色设定、默认关系与场景数据
-│   ├── storage.js              # schema v9 主线、在线事件、织界工坊保存、迁移、导入、导出
+│   ├── storage.js              # schema v10 自动提供方、在线事件、织界工坊保存、迁移、导入、导出
 │   ├── api-engine.js           # 可选在线提供方、超时与离线回退适配
 │   ├── story-engine.js         # 离线故事与聊天模拟引擎
 │   └── styles.css              # 完整视觉系统
@@ -147,7 +147,7 @@ EchoLoom_Interactive_Demo/
 npm test
 ```
 
-测试会检查核心文件、服务器/API 回退、schema v9 与 v8 至 v1 迁移、结构化事件校验、应用规则控制的剧情标记、可追溯记忆、FLUX 场景触发与缓存复用、导入导出、关系信号、同意边界和角色敏感度。
+测试会检查核心文件、服务器/API 回退、schema v10 与 v9 至 v1 迁移、当前 Gemini Interactions 响应解析、自动在线模式、结构化事件校验、应用规则控制的剧情标记、可追溯记忆、FLUX 场景触发与缓存复用、导入导出、关系信号、同意边界和角色敏感度。
 
 ## 使用 Codex 修改
 

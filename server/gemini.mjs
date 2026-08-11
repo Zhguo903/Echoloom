@@ -9,9 +9,12 @@ export class ProviderError extends Error {
   }
 }
 
-function outputText(payload) {
+export function outputText(payload) {
   if (typeof payload?.output_text === 'string') return payload.output_text;
   if (typeof payload?.text === 'string') return payload.text;
+  const stepText = payload?.steps?.filter((step) => step?.type === 'model_output')
+    .flatMap((step) => step?.content || []).find((part) => typeof part?.text === 'string')?.text;
+  if (stepText) return stepText;
   const interactionText = payload?.outputs?.flatMap((output) => output?.content || []).find((part) => typeof part?.text === 'string')?.text;
   if (interactionText) return interactionText;
   return payload?.candidates?.[0]?.content?.parts?.find((part) => typeof part?.text === 'string')?.text || '';
@@ -46,4 +49,3 @@ export async function requestGeminiEvent(prompt, config, { fetchImpl = fetch, al
     clearTimeout(timer);
   }
 }
-

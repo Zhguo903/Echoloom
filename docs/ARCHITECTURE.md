@@ -8,14 +8,14 @@ The project uses plain HTML, CSS, browser JavaScript, editable SVG assets, and a
 
 1. `index.html` creates the desktop presentation shell and mobile viewport.
 2. `app/data.js` loads bilingual copy, five character profiles, five data-driven rescue routes, the five ordered investigation chapters, the five-thread Weaver arc, first-contact copy, journey factories, creation-capacity helpers, and scene metadata.
-3. `app/storage.js` loads schema version 9 from `echoloom.demo.v2`, adds safe live-event/story/scene defaults to schema-version-8 archives, adds Weaver progress to version 7, adds investigation progress to version 6, migrates older routes and EchoLink rosters, or isolates imported schema-version-1 state.
+3. `app/storage.js` loads schema version 10 from `echoloom.demo.v2`, migrates schema-version-9's default offline setting to automatic provider discovery, adds safe live-event/story/scene defaults to version 8, and conservatively migrates all older archives.
 4. `app/story-engine.js` provides character-specific deterministic offline simulation and emits behaviour tags, directional relationship deltas, and player-expression signals.
 5. `app/api-engine.js` optionally calls the local server for a structured live reply and scene background. It maps validated events into the existing UI result shape and falls back to `EchoEngine` on every provider failure.
 6. `server/` keeps provider credentials, selected-character retrieval, prompt assembly, semantic validation, story rules, optional Supabase persistence, and Cloudflare image caching outside the browser.
 7. `app/app.js` renders the onboarding state machine, dynamic Observatory task, sequential investigation, *The First Free Thread*, free tutorial creation, the quota-aware Weaver Workshop, Story/World hubs, EchoLink terminal, selected character journey, relationship/knowledge dossier, and archive tree.
 8. `localStorage` persists every character journey, campaign state, live-event metadata, and up to six non-recursive archive snapshots together. Export/import serializes the full local state as one relationship archive.
 
-## State schema version 9
+## State schema version 10
 
 Important top-level fields:
 
@@ -70,11 +70,13 @@ Memories use five UI types (`fact`, `event`, `promiseBoundary`, `relationshipJud
 
 When the validated event contains `scene.changed: true`, the browser separately calls `POST /api/scene`. `server/scene-service.mjs` builds a deterministic visual prompt, fingerprints it with SHA-256, reuses `.cache/echoloom-scenes`, or calls Cloudflare Workers AI. Dynamic image URLs are restricted to `/api/scenes/<64 hex>.jpg`; imported archives cannot inject an arbitrary image URL. A scene error never changes or blocks the dialogue result.
 
-Provider configuration is read from process variables or the ignored root `.env`. The status route never returns secrets. With every provider disabled, the request adapter stays offline and all pre-existing flows remain functional.
+Provider configuration is read from process variables or the ignored root `.env`. The status route never returns secrets. `aiMode: auto` discovers that status at startup, uses Gemini when configured, and otherwise stays offline without an unnecessary model request. Users can still select `live` or `offline` explicitly. With every provider disabled, all pre-existing flows remain functional.
+
+Gemini Interactions responses are read from the current `steps[] → model_output → content[]` structure, with older `output_text`, `outputs`, and candidate formats retained as compatibility fallbacks. Up to 24 recent messages are included after removing a duplicate copy of the current input. Prompt rules prioritize the current message, interpret terse clarification turns from immediate context, allow ordinary non-plot conversation, and reject recent-response repetition.
 
 ## Compatibility
 
-Schema-version-9 exports restore onboarding, all five journeys, investigation progress, Weaver progress, live events/memories/cached-scene metadata, quota use, tutorial and formal creations, EchoLink, campaign, and branches. Schema-version-8 files receive safe live defaults without losing their provider preference or prior journey data. Version-7 files preserve their completed Xu Cheng outcome and receive a locked Weaver arc ready to open from that outcome. Version-6 files receive a fresh investigation at Wen Sheng’s briefing while preserving their existing first-response route, journeys, messages, and archives. Older migrations remain conservative and unchanged.
+Schema-version-10 exports restore onboarding, all five journeys, investigation progress, Weaver progress, live events/memories/cached-scene metadata, provider preference, quota use, tutorial and formal creations, EchoLink, campaign, and branches. Schema-version-9 archives that still contain the old default `offline` value migrate to `auto`; schema-version-8 files keep an explicit `live` choice and receive safe live defaults. Older relationship, story, and archive migrations remain conservative.
 
 EchoLink uses the existing `chatReply` engine for core-character private messages. Group, side-NPC, delayed delivery, contact permission, promises, and high-risk relationship transitions remain rules-controlled. Private player-intent metadata is stored on the player message but is not inserted into NPC-visible text.
 

@@ -6,6 +6,7 @@
 
   function inferIntent(input) {
     const text = normalize(input);
+    if (/^[?？]+$/.test(text) || includesAny(text, ['什么意思', '没听懂', '说清楚', 'what do you mean', 'clarify'])) return 'clarify';
     if (includesAny(text, ['不许', '只能陪我', '必须陪我', '必须把', '必须成为', '别离开', '不准走', 'control you', 'you must', 'must give', 'must be', 'cannot leave'])) return 'control';
     if (includesAny(text, ['骗你', '撒谎', '故意隐瞒', 'lied', 'deceive', 'misled'])) return 'deception';
     if (includesAny(text, ['抱歉', '对不起', '道歉', '修复', 'sorry', 'apolog', 'make it right'])) return 'repair';
@@ -24,6 +25,7 @@
   const replies = {
     qian: {
       zh: {
+        clarify: ['你是在问我刚才那句话吗？我换个更直接的说法：我不会替你决定，但愿意听你把真正想说的部分讲完。'],
         flirt: ['谢谢你愿意告诉我。不过我们才刚认识。先多相处一段时间，对彼此都更公平。', '我只是尽量照顾每一位新同事。至于其他的……我们还没有熟到可以下结论。'],
         control: ['我可以选择留下，但不能接受你替我决定。我想我们都先停一下。', '在意一个人不等于拥有他的时间。这个边界需要说清楚。'],
         deception: ['你可以暂时不告诉我，但不能让我一直依照错误的信息行动。等你愿意诚实，我们再继续。'],
@@ -38,6 +40,7 @@
         open: ['先从这张损坏最轻的开始吧。我示范一次，然后由你决定要不要接手。', '我在听。工作上的判断和你自己的感受，都可以分开说。']
       },
       en: {
+        clarify: ['Are you asking about what I just said? More directly: I will not decide for you, but I am willing to hear what you actually want to say.'],
         flirt: ['Thank you for telling me. We have only just met; taking time to know each other would be fairer to both of us.', 'I try to look after every new colleague. Anything beyond that is too early to conclude.'],
         control: ['I can choose to stay, but I cannot accept you deciding for me. We should pause here.', 'Caring about someone does not give you ownership of their time. That boundary matters.'],
         deception: ['You may choose not to tell me yet, but you cannot ask me to act on false information. We can continue when you are ready to be honest.'],
@@ -54,6 +57,7 @@
     },
     shenyao: {
       zh: {
+        clarify: ['如果你是在问我刚才的意思：我还没有足够信息下结论。指出哪一句不清楚，我会直接解释依据。'],
         flirt: ['你喜欢的可能只是目前看到的部分，不是完整的我。我不会在信息不足时给你答案。', '观察对象是我的工作。把职业行为解释成感情，结论下得太早。'],
         control: ['要求我服从不是建立关系的方法。我会结束今天的观测，等边界重新明确再谈。', '你可以表达希望，但不能替我决定。我对这一点没有模糊空间。'],
         deception: ['我可以接受你暂时不告诉我，但不能接受你故意让我相信错误的事。'],
@@ -68,6 +72,7 @@
         open: ['你可以质疑我的结论。先从你认为最不合理的一项开始。', '我还没有形成判断。现在说服我，或者让我说服你。']
       },
       en: {
+        clarify: ['If you mean my last message: I do not have enough evidence for a conclusion yet. Point to the unclear part and I will explain the basis directly.'],
         flirt: ['You may like the part currently visible, not the whole of me. I will not answer with insufficient information.', 'Observation is my work. Interpreting professional attention as affection is premature.'],
         control: ['Compliance is not a basis for a relationship. I am ending today’s observation until the boundary is clear again.', 'You may state what you want, but you cannot decide for me. There is no ambiguity there.'],
         deception: ['I can accept that you are not ready to tell me. I cannot accept being deliberately led to believe something false.'],
@@ -84,6 +89,7 @@
     },
     lichuan: {
       zh: {
+        clarify: ['你是在问我刚才什么意思？简单说，我是在邀请你，不是在替你决定；不想去也完全可以。'],
         flirt: ['这句话我很喜欢听，但先别急着把它变成承诺。我们至少该先一起错过几趟车。', '玩笑我可以接住，认真关系要靠之后怎么同行。现在还太早。'],
         control: ['在意一个人和替他决定去哪儿，不是同一件事。你不能替我取消行程。', '如果留下的条件是失去自由，那我会选择离开。'],
         deception: ['路线可以临时改，事实不能故意改。你先把真正的情况告诉我。'],
@@ -98,6 +104,7 @@
         open: ['我把两张路线图都放这儿。热闹的快一点，安静的绕远一点，你选。', '同路只是开始。要不要继续同行，等下一站再决定。']
       },
       en: {
+        clarify: ['Do you mean my last message? Simply put, I am inviting you, not deciding for you; saying no is completely fine.'],
         flirt: ['I like hearing that, but do not turn it into a promise yet. We should miss a few trains together first.', 'I can play along with a joke. A real relationship depends on how we travel later; it is too early now.'],
         control: ['Caring about someone is not the same as choosing their destination. You cannot cancel my route for me.', 'If staying requires losing my freedom, I will choose to leave.'],
         deception: ['A route can change unexpectedly. Facts cannot be changed on purpose. Tell me what actually happened.'],
@@ -114,6 +121,7 @@
     },
     zhoutang: {
       zh: {
+        clarify: ['如果你是在问刚才那句：我需要先把权限和风险说清楚，不是要回避你的问题。'],
         flirt: ['我听懂了，但别把高强度合作直接解释成恋爱。先看看我们能不能在分歧里继续守住彼此边界。', '我不排斥这个可能，也不会因为气氛替自己确认。现在先把话放在这里。'],
         control: ['替我决定哪些风险不能承担，不是保护，是越权。今天的访问权限到这里。', '你可以拒绝参与，但不能替我取消我的工作。边界重新说清楚以前，我不会继续。'],
         deception: ['你可以拒绝交出日志，也可以只给我一部分；暗中复制会让整个审计失去可信基础。先停止同步。'],
@@ -128,6 +136,7 @@
         open: ['先定义范围：哪些可以看，哪些绝对不进日志，然后我们共同检查。', '我把三种审计方式列出来。你选权限，我承担对应的技术后果。']
       },
       en: {
+        clarify: ['If you mean my last message: I need to make the access and risk explicit first; I am not avoiding your question.'],
         flirt: ['I understand, but intense cooperation is not automatically romance. First let us see whether we can protect each other’s boundaries in disagreement.', 'I am not rejecting the possibility, and I will not confirm it for the sake of a mood. Leave it here for now.'],
         control: ['Deciding which risks I may take is not protection; it is overreach. Your access ends here today.', 'You may refuse to participate, but you cannot cancel my work for me. We stop until the boundary is clear.'],
         deception: ['You could refuse the log or share only part of it. A secret copy destroys the basis of the audit. Stop syncing now.'],
@@ -144,6 +153,7 @@
     },
     wensheng: {
       zh: {
+        clarify: ['你是在问我刚才的意思吗？我想说的是，这里的人应该保留自己的答案，而不是由创作者替他们决定。'],
         flirt: ['你喜欢的也许是我在这个世界里的样子。我愿意继续认识，但不想被一个漂亮投影替我回答。', '这句话可以留下，不过先别把它写成结局。我们还没看见彼此在普通日子里的样子。'],
         control: ['你不能替我规定这个故事必须怎么结束，也不能把我固定成你需要的角色。这里先停。', '共同创作不等于把作者交给另一个人拥有。我会退出这个版本。'],
         deception: ['我可以接受你保留私人想法，不能接受你偷偷改写选择后还让我相信那是原来的故事。'],
@@ -158,6 +168,7 @@
         open: ['我把剩下的句子折成了两只鸟。你选一只，也可以自己写第三种可能。', '先问这里的人想留下什么。创作者不应该是唯一拥有答案的人。']
       },
       en: {
+        clarify: ['Are you asking what I meant? I mean that people here should keep their own answers instead of having the creator decide for them.'],
         flirt: ['You may like who I am in this world. I want to keep knowing you, but not let a beautiful projection answer for me.', 'That line may stay, but do not make it an ending yet. We have not met each other in ordinary days.'],
         control: ['You cannot decide how this story must end or fix me into the role you need. We stop here.', 'Co-creation does not transfer ownership of the author. I am leaving this version.'],
         deception: ['You may keep private thoughts. You may not secretly rewrite a choice and ask me to believe it is the original story.'],

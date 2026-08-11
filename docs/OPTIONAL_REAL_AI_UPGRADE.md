@@ -26,7 +26,7 @@ free-text input
 1. Copy `.env.example` to `.env`. The zero-dependency server reads `.env` automatically; process environment variables take precedence.
 2. Add `GEMINI_API_KEY` to enable live dialogue. `GEMINI_MODEL` is configurable and defaults to `gemini-3.6-flash`.
 3. Optionally add Supabase and/or Cloudflare values described below.
-4. Run `npm start` and select **Gemini server API** in Settings. Never open a live test by serving the browser files from a different server.
+4. Run `npm start`. Schema v10's default **Automatic** mode detects the server key and enables Gemini; Settings also offers **Always try Gemini** and **Force offline simulation**. Never open a live test by serving the browser files from a different server.
 
 Do not commit `.env`. The provider-status endpoint reports only whether a provider is configured and which public model name is selected; it never returns a credential.
 
@@ -51,7 +51,7 @@ The migration creates users, worlds, characters, relationships, chat messages, m
 
 ## Gemini Game Event
 
-`POST /api/chat` accepts only a known character ID, a 1–1000 character message, bounded recent context, and the current branch. The server retrieves at most six relevant non-obsolete memories and builds the official persona prompt. It requests JSON structured output, then validates it again before use.
+`POST /api/chat` accepts only a known character ID, a 1–1000 character message, up to 24 recent messages, and the current branch. The server retrieves at most six relevant non-obsolete memories and builds the official persona prompt. It requests JSON structured output, reads the current Interactions `steps[].content[]` response, then validates it again before use. The prompt must answer the current message first, treats terse clarification as a follow-up to the latest character reply, permits ordinary conversation, and forbids repeating recent character output.
 
 The normalized event contains:
 

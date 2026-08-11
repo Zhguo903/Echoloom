@@ -30,6 +30,9 @@ const context = vm.createContext({
   Response,
   document: { baseURI: 'http://127.0.0.1:5173/' },
   fetch: async (_url, options) => {
+    if (String(_url).endsWith('/api/provider-status')) {
+      return new Response(JSON.stringify({ gemini: { configured: true, model: 'gemini-test' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
     if (String(_url).endsWith('/api/scene')) {
       sceneCalls += 1;
       const sceneBody = JSON.parse(options.body);
@@ -49,6 +52,8 @@ const context = vm.createContext({
 });
 vm.runInContext(await readFile(path.join(root, 'app/api-engine.js'), 'utf8'), context, { filename: 'app/api-engine.js' });
 const api = context.window.EchoApiEngine;
+const discovered = await api.initialize();
+assert.equal(discovered.configured, true);
 const engineState = {
   language: 'zh', activeCharacterId: 'qian', relationship: { trust: 2 }, campaign: { activeBranchId: 'root', mainline: { chapterIndex: 1, phase: 'briefing' } },
   liveStory: { currentChapter: 'character_story_1', currentScene: 'private_archive', flags: { first_contact_complete: true } },
@@ -71,6 +76,10 @@ assert.equal(sentBody.currentStoryState.currentChapter, 'character_story_1');
 assert.equal(sentBody.currentStoryState.currentScene, 'private_archive');
 assert.equal(sentBody.storyFlags.first_contact_complete, true);
 
+const autoEnvelope = await api.reply('chatReply', '你今天在做什么？', engineState, { aiMode: 'auto', minimumDelay: 0 });
+assert.equal(autoEnvelope.source, 'gemini');
+assert.equal(sentBody.message, '你今天在做什么？');
+
 const skippedScene = await api.generateSceneBackground({ changed: false, location: 'archive' }, { aiMode: 'live', characterId: 'qian' });
 assert.equal(skippedScene.skipped, true);
 assert.equal(sceneCalls, 0);
@@ -86,4 +95,4 @@ assert.equal(fallbackEnvelope.result.response, 'offline chat');
 assert.equal(api.status().state, 'fallback');
 
 console.log('EchoLoom browser provider adapter test: PASS');
-console.log('Checked offline default, localized context, live event mapping, scene-change gating, cached background mapping, and typed provider fallback.');
+console.log('Checked forced offline mode, provider discovery, automatic Gemini mode, localized multi-turn context, live event mapping, scene-change gating, cached background mapping, and typed provider fallback.');

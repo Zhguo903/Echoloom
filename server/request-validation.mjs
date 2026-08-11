@@ -39,7 +39,7 @@ export function validateChatRequest(value) {
 
   const relationshipKeys = ['familiarity', 'trust', 'intimacy', 'reciprocity', 'compatibility', 'romanticAttraction', 'sexualAttraction', 'safety', 'commitment', 'strain', 'repair', 'stage', 'status'];
   const storyKeys = ['currentChapter', 'currentScene', 'phase', 'chapterIndex', 'completed', 'finalDecision'];
-  const recentMessages = Array.isArray(body.recentMessages) ? body.recentMessages.slice(-12).map((item) => ({
+  const recentMessages = Array.isArray(body.recentMessages) ? body.recentMessages.slice(-24).map((item) => ({
     role: item?.role === 'character' ? 'character' : 'user',
     text: clean(item?.text, 600)
   })).filter((item) => item.text) : [];
@@ -70,4 +70,3 @@ export function validateChatRequest(value) {
     recentMessages
   };
 }
-

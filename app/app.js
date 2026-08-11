@@ -73,7 +73,7 @@
 
   function apiOptions(extra = {}) {
     return {
-      aiMode: state.settings?.aiMode || 'offline',
+      aiMode: state.settings?.aiMode || 'auto',
       playerName: state.playerName || '',
       playerIntent: extra.playerIntent || '',
       scene: extra.scene || null,
@@ -86,19 +86,23 @@
   }
 
   function providerStatusMarkup() {
-    const mode = state.settings?.aiMode || 'offline';
+    const mode = state.settings?.aiMode || 'auto';
     const runtime = apiStatus();
-    const live = mode === 'live';
-    const tone = live && runtime.source === 'gemini' ? 'live' : live && runtime.state === 'fallback' ? 'fallback' : 'offline';
-    const label = !live
+    const onlineMode = mode !== 'offline';
+    const tone = onlineMode && runtime.state === 'fallback' ? 'fallback' : onlineMode && (runtime.source === 'gemini' || runtime.configured === true) ? 'live' : 'offline';
+    const label = !onlineMode
       ? langText('离线角色引擎', 'Offline character engine')
       : runtime.state === 'loading'
         ? langText('Gemini 正在生成', 'Gemini is generating')
         : runtime.source === 'gemini'
-          ? langText('Gemini 在线 · 结构化事件', 'Gemini live · structured event')
+          ? langText('Gemini 在线 · 开放对话', 'Gemini live · open conversation')
           : runtime.state === 'fallback'
             ? langText('Gemini 不可用 · 已离线继续', 'Gemini unavailable · continued offline')
-            : langText('Gemini 模式 · 自动离线回退', 'Gemini mode · automatic offline fallback');
+            : runtime.configured === true
+              ? langText('Gemini 已连接 · 可以自由对话', 'Gemini connected · open conversation ready')
+              : runtime.configured === false
+                ? langText('自动模式 · 当前使用离线引擎', 'Automatic mode · currently using offline engine')
+                : langText('正在检查 Gemini 配置', 'Checking Gemini configuration');
     return `<div class="provider-status ${tone}" role="status"><i></i><span>${esc(label)}</span></div>`;
   }
 
@@ -213,7 +217,7 @@
       cached: false, requestedAt: new Date().toISOString(), requestId
     };
     window.EchoApiEngine.generateSceneBackground(scene, {
-      aiMode: state.settings?.aiMode || 'offline',
+      aiMode: state.settings?.aiMode || 'auto',
       characterId: context.characterId || state.activeCharacterId,
       language: state.language
     }).then((background) => {
@@ -788,7 +792,7 @@
   function renderSettings() {
     const backRoute = state.resumeScreen && state.resumeScreen !== 'settings' ? state.resumeScreen : (state.onboardingCompleted ? 'observatory-home' : 'title');
     const known = characterIds.filter((id) => state.journeys?.[id]?.met).map((id) => localText(characters[id].name)).join(' · ');
-    return `<section class="app-screen settings-screen">${topBar(t('settings'), '', backRoute, 'none')}<div class="settings-content"><section class="settings-section"><h2>${esc(t('language'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('language'))}</strong><span>English / 中文</span></div><select id="language-select"><option value="zh" ${state.language === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div></section><section class="settings-section"><h2>${esc(langText('角色生成方式', 'Character response provider'))}</h2>${providerStatusMarkup()}<div class="setting-row"><div class="setting-copy"><strong>${esc(langText('对话引擎', 'Dialogue engine'))}</strong><span>${esc(langText('在线失败会自动使用离线角色逻辑，不会中断故事。', 'Online failures automatically use the offline character logic without interrupting the story.'))}</span></div><select id="ai-mode-select"><option value="offline" ${(state.settings.aiMode || 'offline') === 'offline' ? 'selected' : ''}>${esc(langText('离线演绎（默认）', 'Offline simulation (default)'))}</option><option value="live" ${state.settings.aiMode === 'live' ? 'selected' : ''}>${esc(langText('Gemini 服务端 API', 'Gemini server API'))}</option></select></div><div class="data-note">${esc(langText('在线模式只在通过 npm start 打开的页面中可用。角色上下文按人物隔离；API 密钥不会进入浏览器。', 'Live mode is available only through npm start. Character context is isolated per person and API keys never enter the browser.'))}</div></section><section class="settings-section"><h2>${esc(t('notificationFrequency'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('notificationFrequency'))}</strong><span>${esc(t(state.settings.frequency))}</span></div><select id="frequency-select"><option value="gentle" ${state.settings.frequency === 'gentle' ? 'selected' : ''}>${esc(t('gentle'))}</option><option value="normal" ${state.settings.frequency === 'normal' ? 'selected' : ''}>${esc(t('normal'))}</option><option value="quiet" ${state.settings.frequency === 'quiet' ? 'selected' : ''}>${esc(t('quiet'))}</option></select></div><div class="setting-row"><div class="setting-copy"><strong>${esc(t('reduceMotion'))}</strong><span>${esc(langText('减少页面切换与装饰动画。', 'Use fewer transitions and animations.'))}</span></div><button class="toggle ${state.settings.reduceMotion ? 'on' : ''}" type="button" data-action="toggle-motion" aria-pressed="${state.settings.reduceMotion}"><span></span></button></div></section><section class="settings-section"><h2>${esc(langText('故事流程', 'Story flow'))}</h2><div class="data-note">${esc(known ? langText(`当前已认识：${known}`, `Currently known: ${known}`) : langText('尚未完成首次相遇。', 'The first encounter is not complete.'))}</div><button class="secondary-button settings-button" type="button" data-action="restart-onboarding">${esc(langText('重新开始新手剧情', 'Restart onboarding'))}</button><button class="secondary-button settings-button" type="button" data-action="return-title">${esc(langText('返回标题页', 'Return to title'))}</button></section><section class="settings-section"><h2>${esc(langText('关系与分支数据', 'Relationship and branch data'))}</h2><div class="data-note">${esc(t('dataLocal'))}</div><button class="secondary-button settings-button" type="button" data-action="export">${icon('download',14)} ${esc(t('export'))}</button><label class="secondary-button settings-button" for="import-file" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">${icon('upload',14)} ${esc(t('import'))}</label><button class="settings-button danger" type="button" data-action="clear-archive">${esc(langText('清除分支档案', 'Clear branch archive'))}</button><button class="settings-button danger" type="button" data-action="reset">${esc(t('reset'))}</button>${state.legacyArchive ? `<p class="legacy-note">${esc(t('archivedLegacy'))}</p>` : ''}</section></div></section>`;
+    return `<section class="app-screen settings-screen">${topBar(t('settings'), '', backRoute, 'none')}<div class="settings-content"><section class="settings-section"><h2>${esc(t('language'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('language'))}</strong><span>English / 中文</span></div><select id="language-select"><option value="zh" ${state.language === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div></section><section class="settings-section"><h2>${esc(langText('角色生成方式', 'Character response provider'))}</h2>${providerStatusMarkup()}<div class="setting-row"><div class="setting-copy"><strong>${esc(langText('对话引擎', 'Dialogue engine'))}</strong><span>${esc(langText('自动模式检测服务端 Key；在线失败会继续离线故事。', 'Automatic mode detects the server key; online failures continue the offline story.'))}</span></div><select id="ai-mode-select"><option value="auto" ${(state.settings.aiMode || 'auto') === 'auto' ? 'selected' : ''}>${esc(langText('自动选择（推荐）', 'Automatic (recommended)'))}</option><option value="live" ${state.settings.aiMode === 'live' ? 'selected' : ''}>${esc(langText('始终尝试 Gemini', 'Always try Gemini'))}</option><option value="offline" ${state.settings.aiMode === 'offline' ? 'selected' : ''}>${esc(langText('强制离线演绎', 'Force offline simulation'))}</option></select></div><div class="data-note">${esc(langText('通过 npm start 打开后，有效的 Gemini Key 会自动启用开放式多轮对话。角色上下文按人物隔离；API 密钥不会进入浏览器。', 'When opened through npm start, a valid Gemini key automatically enables open multi-turn conversation. Character context is isolated per person and API keys never enter the browser.'))}</div></section><section class="settings-section"><h2>${esc(t('notificationFrequency'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('notificationFrequency'))}</strong><span>${esc(t(state.settings.frequency))}</span></div><select id="frequency-select"><option value="gentle" ${state.settings.frequency === 'gentle' ? 'selected' : ''}>${esc(t('gentle'))}</option><option value="normal" ${state.settings.frequency === 'normal' ? 'selected' : ''}>${esc(t('normal'))}</option><option value="quiet" ${state.settings.frequency === 'quiet' ? 'selected' : ''}>${esc(t('quiet'))}</option></select></div><div class="setting-row"><div class="setting-copy"><strong>${esc(t('reduceMotion'))}</strong><span>${esc(langText('减少页面切换与装饰动画。', 'Use fewer transitions and animations.'))}</span></div><button class="toggle ${state.settings.reduceMotion ? 'on' : ''}" type="button" data-action="toggle-motion" aria-pressed="${state.settings.reduceMotion}"><span></span></button></div></section><section class="settings-section"><h2>${esc(langText('故事流程', 'Story flow'))}</h2><div class="data-note">${esc(known ? langText(`当前已认识：${known}`, `Currently known: ${known}`) : langText('尚未完成首次相遇。', 'The first encounter is not complete.'))}</div><button class="secondary-button settings-button" type="button" data-action="restart-onboarding">${esc(langText('重新开始新手剧情', 'Restart onboarding'))}</button><button class="secondary-button settings-button" type="button" data-action="return-title">${esc(langText('返回标题页', 'Return to title'))}</button></section><section class="settings-section"><h2>${esc(langText('关系与分支数据', 'Relationship and branch data'))}</h2><div class="data-note">${esc(t('dataLocal'))}</div><button class="secondary-button settings-button" type="button" data-action="export">${icon('download',14)} ${esc(t('export'))}</button><label class="secondary-button settings-button" for="import-file" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">${icon('upload',14)} ${esc(t('import'))}</label><button class="settings-button danger" type="button" data-action="clear-archive">${esc(langText('清除分支档案', 'Clear branch archive'))}</button><button class="settings-button danger" type="button" data-action="reset">${esc(t('reset'))}</button>${state.legacyArchive ? `<p class="legacy-note">${esc(t('archivedLegacy'))}</p>` : ''}</section></div></section>`;
   }
 
   function renderBrandSplash() {
@@ -1219,7 +1223,7 @@
     document.getElementById('import-control-label').textContent = t('import');
     document.getElementById('reset-control-label').textContent = t('reset');
     const runtime = apiStatus();
-    const live = state.settings?.aiMode === 'live';
+    const live = state.settings?.aiMode !== 'offline';
     document.getElementById('desktop-demo-badge').textContent = live ? 'Optional Live AI' : 'Offline Prototype';
     document.getElementById('offline-label').textContent = live
       ? runtime.source === 'gemini' ? langText('Gemini 在线 · 离线回退已启用', 'Gemini live · offline fallback enabled') : langText('Gemini 可选 · 当前可离线继续', 'Gemini optional · offline continuation ready')
@@ -2765,7 +2769,7 @@
   app.addEventListener('change', (event) => {
     if (event.target.id === 'language-select') { state.language = event.target.value; render(); }
     if (event.target.id === 'frequency-select') { state.settings.frequency = event.target.value; render(); }
-    if (event.target.id === 'ai-mode-select') { state.settings.aiMode = event.target.value === 'live' ? 'live' : 'offline'; render(); }
+    if (event.target.id === 'ai-mode-select') { state.settings.aiMode = ['auto', 'live', 'offline'].includes(event.target.value) ? event.target.value : 'auto'; render(); }
     if (event.target.id === 'echo-private-intent') { state.campaign.echoLink.privateIntent = event.target.value; }
   });
   document.addEventListener('click', (event) => {
@@ -2803,5 +2807,6 @@
   window.addEventListener('resize', fitPhone);
   fitPhone();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch((error) => console.info('Service worker skipped:', error));
+  window.EchoApiEngine?.initialize?.().then(() => render());
   render();
 })();

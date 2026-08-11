@@ -1,11 +1,18 @@
 (() => {
   const KEY = 'echoloom.demo.v2';
   const LEGACY_KEY = 'echoloom-demo-state-v1';
-  const SCHEMA_VERSION = 9;
+  const SCHEMA_VERSION = 10;
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const data = () => window.ECHOLOOM_DATA;
   const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+  function mergeSettings(saved = {}, sourceVersion = SCHEMA_VERSION) {
+    const base = data().defaultState.settings;
+    const savedMode = ['auto', 'live', 'offline'].includes(saved.aiMode) ? saved.aiMode : base.aiMode;
+    const aiMode = sourceVersion < 10 && savedMode === 'offline' ? 'auto' : savedMode;
+    return { ...base, ...saved, aiMode };
+  }
 
   function migrateRelationship(saved = {}) {
     const base = data().createJourney('qian').relationship;
@@ -210,7 +217,7 @@
       ...base,
       language: saved?.language === 'en' ? 'en' : 'zh',
       screen: 'title',
-      settings: { ...base.settings, ...(saved?.settings || {}) },
+      settings: mergeSettings(saved?.settings || {}, number(saved?.version, 1)),
       legacyArchive: {
         migratedAt: new Date().toISOString(),
         sourceSchemaVersion: number(saved?.version, 1),
@@ -300,7 +307,7 @@
       journeys,
       campaign: mergeCampaign(saved.campaign || {}, sourceVersion),
       archives: Array.isArray(saved.archives) ? saved.archives.slice(0, 6) : [],
-      settings: { ...base.settings, ...(saved.settings || {}) }
+      settings: mergeSettings(saved.settings || {}, sourceVersion)
     };
     delete merged.route;
     return merged;

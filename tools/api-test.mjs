@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createChatEvent } from '../server/chat-service.mjs';
 import { loadConfig } from '../server/config.mjs';
 import { validateGameEvent } from '../server/game-event.mjs';
+import { outputText } from '../server/gemini.mjs';
 import { retrieveMemories } from '../server/memory-retrieval.mjs';
 import { validateChatRequest } from '../server/request-validation.mjs';
 import { applyStoryRules } from '../server/story-rules.mjs';
@@ -33,6 +34,7 @@ assert.equal(event.relationship.tension_delta, -2.5);
 assert.deepEqual(event.story.requested_flags, ['shared_memory_acknowledged']);
 assert.equal(event.memory.save, true);
 assert.equal(event.choices.length, 3);
+assert.equal(outputText({ steps: [{ type: 'thought' }, { type: 'model_output', content: [{ type: 'text', text: '{"dialogue":"from steps"}' }] }] }), '{"dialogue":"from steps"}');
 
 const ruledEvent = applyStoryRules(structuredClone(event), {
   mode: 'chat', relationship: { tension: 3 }, storyFlags: {}, currentStoryState: { currentChapter: 'chapter_2', currentScene: 'archive' }
@@ -69,8 +71,9 @@ const fetchImpl = async (url, options) => {
   assert.equal(body.model, 'gemini-test');
   assert.equal(body.response_format.mime_type, 'application/json');
   assert.match(body.input, /祁安/);
+  assert.match(body.input, /CURRENT message directly/);
   assert.doesNotMatch(body.input, /browser-spoof/);
-  return new Response(JSON.stringify({ output_text: JSON.stringify(rawEvent) }), { status: 200, headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify({ steps: [{ type: 'thought' }, { type: 'model_output', content: [{ type: 'text', text: JSON.stringify(rawEvent) }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
 };
 const config = loadConfig({ GEMINI_API_KEY: 'test-key', GEMINI_MODEL: 'gemini-test' }, root);
 const result = await createChatEvent({
@@ -93,4 +96,4 @@ assert.equal(result.event.story.scene, 'archive');
 assert.equal(result.event.story.flags.shared_memory_acknowledged, true);
 
 console.log('EchoLoom API boundary test: PASS');
-console.log('Checked request isolation, keyword memory retrieval, structured Gemini parsing, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');
+console.log('Checked request isolation, keyword memory retrieval, current Interactions steps parsing, conversational relevance instructions, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');

@@ -1,5 +1,14 @@
 # EchoLink MVP Plan
 
+## Open multi-turn conversation correction — 2026-08-10
+
+- Parse current Gemini Interactions responses from `steps[].content[]` instead of incorrectly treating successful responses as provider failures.
+- Migrate schema-v9's default offline choice to schema-v10 `auto`: use Gemini when the server reports a configured key, preserve a force-offline setting, and keep failure fallback.
+- Expand relevant history to 24 messages and require every live reply to answer the current message, resolve terse follow-ups from immediate context, avoid recent repetition, and allow ordinary non-plot conversation.
+- Keep character identity, boundaries, user-controlled memory, free text, and the offline `EchoEngine` contract unchanged.
+
+Status: Complete — automated suites pass; real Gemini calls answer an ordinary-life question and a terse contextual follow-up; 393 × 852 and 1440 × 1000 browser checks show live status, no horizontal overflow, and no console errors.
+
 ## Optional Gemini + Supabase + Cloudflare API loop — 2026-08-10
 
 ### Product outcome

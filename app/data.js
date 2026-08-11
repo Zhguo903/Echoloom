@@ -1396,7 +1396,7 @@
   };
 
   const defaultState = {
-    version: 9,
+    version: 10,
     language: 'zh',
     screen: 'splash',
     onboardingStarted: false,
@@ -1426,7 +1426,7 @@
     settings: {
       frequency: 'normal',
       reduceMotion: false,
-      aiMode: 'offline'
+      aiMode: 'auto'
     },
     lastUpdated: null
   };

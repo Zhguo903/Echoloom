@@ -39,7 +39,7 @@ export function createSupabaseRepository(config, { fetchImpl = fetch } = {}) {
         request(config, `user_character_relationships?user_id=eq.${user}&character_id=eq.${character}&select=*&limit=1`, { fetchImpl }),
         request(config, `memories?user_id=eq.${user}&character_id=eq.${character}&select=id,content,memory_type,importance,emotion,branch_id,created_at&order=importance.desc,created_at.desc&limit=30`, { fetchImpl }),
         request(config, `story_states?user_id=eq.${user}&character_id=eq.${character}&select=*&limit=1`, { fetchImpl }),
-        request(config, `chat_messages?user_id=eq.${user}&character_id=eq.${character}&select=role,content,created_at&order=created_at.desc&limit=12`, { fetchImpl })
+        request(config, `chat_messages?user_id=eq.${user}&character_id=eq.${character}&select=role,content,created_at&order=created_at.desc&limit=24`, { fetchImpl })
       ]);
       return {
         persona: first(personaRows),
@@ -71,4 +71,3 @@ export function createSupabaseRepository(config, { fetchImpl = fetch } = {}) {
     }
   };
 }
-

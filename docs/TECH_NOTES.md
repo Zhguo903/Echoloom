@@ -4,10 +4,10 @@
 
 - Static HTML, CSS, and JavaScript.
 - No build step and no third-party runtime dependency.
-- State is stored in browser `localStorage` under `echoloom.demo.v2` and migrates through schema version 9.
+- State is stored in browser `localStorage` under `echoloom.demo.v2` and migrates through schema version 10. Automatic mode uses Gemini when the local server reports a configured key and otherwise remains offline.
 - The default scene generator is deterministic and keyword-based. Optional live events can request a server-generated FLUX background only after `scene.changed`, with a SHA-256 disk cache and packaged fallback.
 - Content is separated into `app/data.js` to keep bilingual copy, character profiles, journey defaults, and scene metadata editable.
-- Schema version 9 stores separate journeys for Qi An, Shen Yao, Li Chuan, Zhou Tang, and Wen Sheng plus live story/scene metadata, opening decisions, EchoLink, shared campaign, and recoverable archive state.
+- Schema version 10 stores separate journeys for Qi An, Shen Yao, Li Chuan, Zhou Tang, and Wen Sheng plus automatic/live/offline preference, live story/scene metadata, opening decisions, EchoLink, shared campaign, and recoverable archive state.
 - The app uses a small state machine rather than URL routing.
 - Opening chapters and generated scenes use a cinematic spotlight only before the first player message. Once conversation begins, every character and player message stays in one insertion-ordered history so a reply cannot appear above the message that triggered it.
 - The service worker caches the prototype when served over HTTP.

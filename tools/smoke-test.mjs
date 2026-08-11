@@ -63,6 +63,15 @@ for (const expected of ['qian', 'shenyao', 'lichuan', 'zhoutang', 'wensheng', 'å
 
 const child = spawn(process.execPath, ['tools/server.mjs', `--port=${port}`, '--no-open'], {
   cwd: root,
+  env: {
+    ...process.env,
+    GEMINI_API_KEY: '',
+    SUPABASE_URL: '',
+    SUPABASE_SERVICE_ROLE_KEY: '',
+    ECHOLOOM_DEMO_USER_ID: '',
+    CLOUDFLARE_ACCOUNT_ID: '',
+    CLOUDFLARE_API_TOKEN: ''
+  },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 

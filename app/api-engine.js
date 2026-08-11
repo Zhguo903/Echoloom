@@ -4,9 +4,11 @@
     state: 'idle',
     errorCode: null,
     model: null,
+    configured: null,
     updatedAt: null,
     scene: { state: 'idle', cached: false, errorCode: null }
   };
+  let providerDiscovery = null;
 
   const delay = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
@@ -47,13 +49,16 @@
     }));
   }
 
-  function recentMessages(method, engineState, options) {
+  function recentMessages(method, engineState, options, currentInput = '') {
     const source = method === 'sceneReply'
       ? (options.scene?.messages || [])
       : method === 'storyReply'
         ? (engineState.storyMessages || [])
         : (engineState.chatMessages || []);
-    return source.slice(-12).map((message) => ({ ...message, text: localized(message.text, engineState.language) }));
+    const messages = source.slice(-24).map((message) => ({ ...message, text: localized(message.text, engineState.language) }));
+    const last = messages.at(-1);
+    if (last?.role === 'user' && last.text.trim() === String(currentInput).trim()) messages.pop();
+    return messages;
   }
 
   function normalizeLiveResult(event, base) {
@@ -77,9 +82,28 @@
     Object.assign(runtime, next, { updatedAt: new Date().toISOString() });
   }
 
+  async function initialize() {
+    if (runtime.configured !== null) return { configured: runtime.configured, model: runtime.model };
+    if (providerDiscovery) return providerDiscovery;
+    providerDiscovery = fetch(new URL('api/provider-status', document.baseURI), { headers: { accept: 'application/json' } })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        runtime.configured = response.ok && payload?.gemini?.configured === true;
+        if (payload?.gemini?.model) runtime.model = payload.gemini.model;
+        return { configured: runtime.configured, model: runtime.model };
+      })
+      .catch(() => {
+        runtime.configured = false;
+        return { configured: false, model: null };
+      });
+    return providerDiscovery;
+  }
+
   async function requestReply(method, input, engineState, options = {}) {
     const base = offlineResult(method, input, engineState, options);
-    if (options.aiMode !== 'live') {
+    const mode = ['auto', 'live', 'offline'].includes(options.aiMode) ? options.aiMode : 'auto';
+    const discovery = mode === 'auto' ? await initialize() : null;
+    if (mode === 'offline' || (mode === 'auto' && !discovery?.configured)) {
       setRuntime({ source: 'offline', state: 'ready', errorCode: null, model: null });
       return { result: base, source: 'offline', fallback: false };
     }
@@ -106,7 +130,7 @@
           currentStoryState: storySnapshot(engineState),
           storyFlags: engineState.liveStory?.flags || {},
           memories: memorySnapshot(engineState.memories || [], engineState.language),
-          recentMessages: recentMessages(method, engineState, options)
+          recentMessages: recentMessages(method, engineState, options, input)
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -132,7 +156,7 @@
   }
 
   async function generateSceneBackground(scene, options = {}) {
-    if (options.aiMode !== 'live' || scene?.changed !== true) return { skipped: true, fallback: false };
+    if (options.aiMode === 'offline' || scene?.changed !== true) return { skipped: true, fallback: false };
     runtime.scene = { state: 'loading', cached: false, errorCode: null };
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 25_000);
@@ -160,6 +184,7 @@
   }
 
   window.EchoApiEngine = {
+    initialize,
     reply,
     generateSceneBackground,
     status: () => ({ ...runtime })
