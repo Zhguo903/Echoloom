@@ -6,12 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const liveEvent = {
-  dialogue: '先坐一会儿。你愿意说的时候我再听。', emotion: 'gentle', expression: 'concerned',
+  dialogue: '先坐一会儿。你愿意说的时候我再听。',
+  dialogueLocalized: { zh: '先坐一会儿。你愿意说的时候我再听。', en: 'Sit for a while. I will listen when you are ready.' },
+  emotion: 'gentle', expression: 'concerned',
   relationship: { intimacy_delta: 1, trust_delta: 1.5, romance_delta: 0, tension_delta: -0.5 },
   story: { chapter: 'current', event: 'quiet-company', unlock_event: null, requested_flags: [], flags: {} },
   scene: { changed: false, location: 'archive', time: 'evening', weather: 'rain', mood: 'quiet' },
-  memory: { save: true, importance: 8, content: 'User prefers quiet company when tired.', memory_type: 'preference', emotion: 'tired' },
-  choices: [{ text: '慢慢说明情况', intent: 'open_up' }]
+  memory: { save: true, importance: 8, content: '用户疲惫时更喜欢安静陪伴。', contentLocalized: { zh: '用户疲惫时更喜欢安静陪伴。', en: 'User prefers quiet company when tired.' }, memory_type: 'preference', emotion: 'tired' },
+  choices: [{ text: '慢慢说明情况', textLocalized: { zh: '慢慢说明情况', en: 'Explain slowly' }, intent: 'open_up' }]
 };
 
 let fetchMode = 'success';
@@ -40,6 +42,10 @@ const context = vm.createContext({
       assert.equal(sceneBody.characterId, 'qian');
       assert.equal(sceneBody.scene.changed, true);
       return new Response(JSON.stringify({ fingerprint: 'a'.repeat(64), image: `/api/scenes/${'a'.repeat(64)}.jpg`, cached: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (String(_url).endsWith('/api/localize')) {
+      const localizationBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ translations: localizationBody.items.map((item) => ({ id: item.id, text: 'Translated legacy reply.' })), meta: { model: 'gemini-test' } }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     sentBody = JSON.parse(options.body);
     sentBodies.push(sentBody);
@@ -70,7 +76,8 @@ assert.equal(offlineEnvelope.result.response, 'offline chat');
 
 const liveEnvelope = await api.reply('chatReply', '今天很累', engineState, { aiMode: 'live', minimumDelay: 0, userId: 'spoofed' });
 assert.equal(liveEnvelope.source, 'gemini');
-assert.equal(liveEnvelope.result.response, liveEvent.dialogue);
+assert.equal(liveEnvelope.result.response.zh, liveEvent.dialogueLocalized.zh);
+assert.equal(liveEnvelope.result.response.en, liveEvent.dialogueLocalized.en);
 assert.equal(liveEnvelope.result.relationshipDelta.trust, 1.5);
 assert.equal(liveEnvelope.result.relationshipDelta.romanticAttraction, 0);
 assert.equal(sentBody.memories[0].content, '用户喜欢雨夜。');
@@ -78,6 +85,9 @@ assert.equal(sentBody.recentMessages[0].text, '你可以慢慢说。');
 assert.equal(sentBody.currentStoryState.currentChapter, 'character_story_1');
 assert.equal(sentBody.currentStoryState.currentScene, 'private_archive');
 assert.equal(sentBody.storyFlags.first_contact_complete, true);
+
+const localizedLegacy = await api.localize([{ id: 'legacy-1', text: '旧回复' }], 'en', { aiMode: 'live' });
+assert.equal(localizedLegacy.translations[0].text, 'Translated legacy reply.');
 
 const autoEnvelope = await api.reply('chatReply', '你今天在做什么？', engineState, { aiMode: 'auto', minimumDelay: 0 });
 assert.equal(autoEnvelope.source, 'gemini');
@@ -129,4 +139,4 @@ assert.equal(fallbackEnvelope.result.response, 'offline chat');
 assert.equal(api.status().state, 'fallback');
 
 console.log('EchoLoom browser provider adapter test: PASS');
-console.log('Checked forced offline mode, provider discovery, automatic Gemini mode, bounded long-conversation context, relevant-memory selection, 413 compact retry, live event mapping, scene-change gating, cached background mapping, and typed provider fallback.');
+console.log('Checked forced offline mode, provider discovery, automatic Gemini mode, bilingual live-event mapping, legacy localization, bounded long-conversation context, relevant-memory selection, 413 compact retry, scene-change gating, cached background mapping, and typed provider fallback.');

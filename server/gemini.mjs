@@ -45,7 +45,7 @@ function waitForRetry(milliseconds, signal) {
   });
 }
 
-export async function requestGeminiEvent(prompt, config, { fetchImpl = fetch, allowedFlags = [], onModelUsed = () => {} } = {}) {
+export async function requestGeminiStructured(prompt, schema, config, { fetchImpl = fetch, onModelUsed = () => {}, transform = (value) => value } = {}) {
   if (!config.apiKey) throw new ProviderError('Gemini is not configured.', 'provider_unavailable', 503);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -60,14 +60,14 @@ export async function requestGeminiEvent(prompt, config, { fetchImpl = fetch, al
         body: JSON.stringify({
           model: activeModel,
           input: prompt,
-          response_format: { type: 'text', mime_type: 'application/json', schema: GAME_EVENT_SCHEMA }
+          response_format: { type: 'text', mime_type: 'application/json', schema }
         })
       });
       const payload = await response.json().catch(() => ({}));
       if (response.ok) {
-        const event = validateGameEvent(parseModelJson(outputText(payload)), { allowedFlags });
+        const result = transform(parseModelJson(outputText(payload)));
         onModelUsed(activeModel);
-        return event;
+        return result;
       }
 
       const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
@@ -88,4 +88,12 @@ export async function requestGeminiEvent(prompt, config, { fetchImpl = fetch, al
   } finally {
     clearTimeout(timer);
   }
+}
+
+export function requestGeminiEvent(prompt, config, { fetchImpl = fetch, allowedFlags = [], onModelUsed = () => {} } = {}) {
+  return requestGeminiStructured(prompt, GAME_EVENT_SCHEMA, config, {
+    fetchImpl,
+    onModelUsed,
+    transform: (value) => validateGameEvent(value, { allowedFlags })
+  });
 }

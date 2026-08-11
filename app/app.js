@@ -40,12 +40,12 @@
   const characterNarrativeScreens = new Set(['signal-detail', 'first-rescue', 'event-result', 'story', 'summary']);
   const demoGroups = [
     { title: ['核心叙事', 'Core narrative'], steps: [
-      ['title', '品牌与标题'], ['prologue', '17 秒序章'], ['signal-scan', '五处信号'], ['signal-confirm', '优先响应'],
-      ['first-rescue', '首次救援'], ['first-contact', '联系建立'], ['observatory-home', '观测站首页'], ['mainline-chapter', '第十七秒之后'], ['weaver-mainline', '第一根自由的线'], ['archive-branches', '分支档案']
+      ['title', '品牌与标题', 'Brand & title'], ['prologue', '17 秒序章', '17-second prologue'], ['signal-scan', '五处信号', 'Five signals'], ['signal-confirm', '优先响应', 'Priority response'],
+      ['first-rescue', '首次救援', 'First rescue'], ['first-contact', '联系建立', 'Contact established'], ['observatory-home', '观测站首页', 'Observatory home'], ['mainline-chapter', '第十七秒之后', 'After the seventeenth second'], ['weaver-mainline', '第一根自由的线', 'The First Free Thread'], ['archive-branches', '分支档案', 'Branch archive']
     ] },
     { title: ['功能演示', 'Feature demos'], steps: [
-      ['echolink', 'EchoLink'], ['relationship', '关系观测'], ['sharedEvent', '共同场景'], ['world-hub', '世界与 NPC'],
-      ['echoes', '类型化记忆'], ['together', '随机世界'], ['creator', '织界工坊']
+      ['echolink', 'EchoLink', 'EchoLink'], ['relationship', '关系观测', 'Relationship view'], ['sharedEvent', '共同场景', 'Shared scene'], ['world-hub', '世界与 NPC', 'Worlds & NPCs'],
+      ['echoes', '类型化记忆', 'Typed memories'], ['together', '随机世界', 'Random world'], ['creator', '织界工坊', 'Weaver Workshop']
     ] }
   ];
 
@@ -70,6 +70,101 @@
   const activeJourney = () => state.activeCharacterId ? state.journeys?.[state.activeCharacterId] || null : null;
   const engineState = () => ({ ...(activeJourney() || {}), language: state.language, activeCharacterId: state.activeCharacterId, campaign: state.campaign });
   const langText = (zh, en) => state.language === 'en' ? en : zh;
+  const bilingual = (zh, en) => ({ zh: String(zh ?? ''), en: String(en ?? '') });
+
+  function localizedPair(primary, localizedValue = null, primaryLanguage = state.language) {
+    const selected = primaryLanguage === 'en' ? 'en' : 'zh';
+    const other = selected === 'en' ? 'zh' : 'en';
+    const object = localizedValue && typeof localizedValue === 'object' && !Array.isArray(localizedValue) ? localizedValue : {};
+    const selectedText = String(object[selected] || primary || object[other] || '').trim();
+    const otherText = String(object[other] || primary || selectedText).trim();
+    return { [selected]: selectedText, [other]: otherText };
+  }
+
+  function inferredLanguage(value) {
+    return /[\u3400-\u9fff]/.test(String(value || '')) ? 'zh' : 'en';
+  }
+
+  function liveChoiceText(choice) {
+    if (!choice) return '';
+    if (choice.text && typeof choice.text === 'object') return localText(choice.text);
+    const text = String(choice.text || '');
+    const language = choice.language || inferredLanguage(text);
+    return language === state.language ? text : '';
+  }
+
+  function prependLocalized(prefix, value) {
+    const source = value && typeof value === 'object' && !Array.isArray(value)
+      ? localizedPair('', value)
+      : localizedPair(value, null, state.language);
+    return {
+      zh: `${prefix.zh} ${source.zh}`.trim(),
+      en: `${prefix.en} ${source.en}`.trim()
+    };
+  }
+
+  let languageLocalizationToken = 0;
+
+  function generatedLocalizationEntries(targetLanguage) {
+    const entries = new Map();
+    const add = (object, key, eligible = true) => {
+      const value = object?.[key];
+      if (!eligible || typeof value !== 'string' || !value.trim() || inferredLanguage(value) === targetLanguage) return;
+      if (!entries.has(value)) entries.set(value, { id: `localized-${entries.size + 1}`, text: value, sourceLanguage: inferredLanguage(value), refs: [] });
+      entries.get(value).refs.push({ object, key });
+    };
+    const collectMessages = (messages = []) => messages.slice(-80).forEach((message) => {
+      const generated = message?.provider === 'gemini'
+        || message?.role === 'character'
+        || (typeof message?.sender === 'string' && message.sender !== 'player');
+      add(message, 'text', generated);
+      add(message, 'relationshipNote', generated);
+    });
+    const conversations = Object.values(state.campaign?.echoLink?.conversations || {});
+    const activeConversationId = state.campaign?.echoLink?.activeThreadId;
+    const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
+    if (activeConversation) collectMessages(activeConversation.messages);
+    const orderedCharacterIds = [state.activeCharacterId, ...characterIds].filter((id, index, values) => id && values.indexOf(id) === index);
+    orderedCharacterIds.forEach((id) => {
+      const journey = state.journeys?.[id];
+      if (!journey) return;
+      const activeChatFirst = id === state.activeCharacterId && ['chat', 'home', 'echolink'].includes(state.screen);
+      collectMessages(activeChatFirst ? journey.chatMessages : journey.storyMessages);
+      collectMessages(activeChatFirst ? journey.storyMessages : journey.chatMessages);
+      (journey.generatedScenes || []).slice(-8).forEach((scene) => collectMessages(scene.messages));
+      (journey.liveChoices || []).forEach((choice) => add(choice, 'text'));
+    });
+    conversations.filter((conversation) => conversation !== activeConversation).forEach((conversation) => collectMessages(conversation.messages));
+    return [...entries.values()].slice(0, 40);
+  }
+
+  async function localizeLegacyGeneratedText(targetLanguage, token) {
+    const entries = generatedLocalizationEntries(targetLanguage);
+    if (!entries.length || !window.EchoApiEngine?.localize) return;
+    const response = await window.EchoApiEngine.localize(entries.map(({ id, text }) => ({ id, text })), targetLanguage, apiOptions());
+    const translations = new Map((response.translations || []).map((item) => [item.id, String(item.text || '').trim()]));
+    entries.forEach((entry) => {
+      const translated = translations.get(entry.id);
+      if (!translated) return;
+      const pair = entry.sourceLanguage === 'zh'
+        ? bilingual(entry.text, translated)
+        : bilingual(translated, entry.text);
+      entry.refs.forEach(({ object, key }) => {
+        object[key] = pair;
+        if (key === 'text' && Object.hasOwn(object, 'language')) object.language = null;
+      });
+    });
+    if (token === languageLocalizationToken) render();
+  }
+
+  function setInterfaceLanguage(language) {
+    const next = language === 'en' ? 'en' : 'zh';
+    if (next === state.language) return;
+    state.language = next;
+    const token = ++languageLocalizationToken;
+    render();
+    localizeLegacyGeneratedText(next, token);
+  }
 
   function apiOptions(extra = {}) {
     return {
@@ -115,13 +210,13 @@
     if (!result?.gameEvent) return '';
     const delta = result.relationshipDelta || {};
     if (Number(delta.trust || 0) < 0 || Number(delta.strain || 0) > 0) {
-      return langText('这次回应让彼此更谨慎；关系需要通过后续对话解释，而不会被一个分数定义。', 'This response makes both sides more cautious; later conversation, not a score, will explain the relationship.');
+      return bilingual('这次回应让彼此更谨慎；关系需要通过后续对话解释，而不会被一个分数定义。', 'This response makes both sides more cautious; later conversation, not a score, will explain the relationship.');
     }
     if (Number(delta.romanticAttraction || 0) > 0) {
-      return langText('对方注意到你表达的靠近，但没有替你们定义关系。', 'The character noticed your attempt to move closer without defining the relationship for either of you.');
+      return bilingual('对方注意到你表达的靠近，但没有替你们定义关系。', 'The character noticed your attempt to move closer without defining the relationship for either of you.');
     }
     if (Number(delta.trust || 0) > 0 || Number(delta.intimacy || 0) > 0) {
-      return langText('对方更愿意把这件事与你一起处理；关系仍由共同经历与确认继续发展。', 'The character is more willing to handle this with you; the bond still develops through shared experience and mutual confirmation.');
+      return bilingual('对方更愿意把这件事与你一起处理；关系仍由共同经历与确认继续发展。', 'The character is more willing to handle this with you; the bond still develops through shared experience and mutual confirmation.');
     }
     return '';
   }
@@ -171,8 +266,8 @@
     journey.memories.unshift({
       id,
       section: Number(memory.importance) >= 9 ? 'pinned' : 'aboutUser',
-      text: String(memory.content).trim().slice(0, 1000),
-      source: langText(`Gemini 结构化事件 · ${context.sourceMessageId || '本次对话'}`, `Gemini structured event · ${context.sourceMessageId || 'this turn'}`),
+      text: localizedPair(memory.content, memory.contentLocalized, state.language),
+      source: bilingual(`Gemini 结构化事件 · ${context.sourceMessageId || '本次对话'}`, `Gemini structured event · ${context.sourceMessageId || 'this turn'}`),
       pinned: Number(memory.importance) >= 9,
       permanent: true,
       type,
@@ -196,7 +291,11 @@
   function applyStructuredPresentation(result, journey = activeJourney(), context = {}) {
     if (!journey || !result?.gameEvent) return {};
     const event = result.gameEvent;
-    journey.liveChoices = Array.isArray(event.choices) ? event.choices.slice(0, 3) : [];
+    journey.liveChoices = Array.isArray(event.choices) ? event.choices.slice(0, 3).map((choice) => ({
+      text: localizedPair(choice.text, choice.textLocalized, state.language),
+      intent: choice.intent || 'respond',
+      language: null
+    })) : [];
     journey.liveExpression = event.expression || 'neutral';
     journey.liveEmotion = event.emotion || 'neutral';
     const appliedFlags = applyLiveStoryRules(result, journey, context);
@@ -386,17 +485,18 @@
     if (!character || !journey) return renderDiscover();
     const messages = journey.storyMessages || [];
     const conversation = chronologicalStoryView(messages);
-    const choices = journey.liveChoices?.length ? journey.liveChoices.map((choice) => choice.text) : character.options.map((option) => localText(option));
+    const liveChoices = (journey.liveChoices || []).map(liveChoiceText).filter(Boolean);
+    const choices = liveChoices.length ? liveChoices : character.options.map((option) => localText(option));
     return `<section class="app-screen story-screen" data-expression="${esc(journey.liveExpression || 'neutral')}">${statusBar()}<div class="story-scene"><img class="story-scene-bg" src="${esc(character.storyBg)}" alt=""><div class="story-top-actions"><button class="round-icon-button" type="button" data-action="go" data-route="discover" aria-label="${esc(langText('返回角色选择', 'Back to character discovery'))}">${icon('back',18)}</button><button class="round-icon-button" type="button" data-action="go" data-route="settings" aria-label="${esc(t('settings'))}">${icon('settings',17)}</button></div><div class="story-header"><span class="chapter">${esc(t('chapterOne'))} · ${esc(localText(character.relation))}</span><h1>${esc(localText(character.chapterTitle))}</h1><p>${esc(localText(character.chapterSubtitle))}</p></div>${conversation.spotlight ? `<div class="story-dialogue-wrap">${dialogueCard(conversation.spotlight)}</div>` : ''}</div><div class="story-interaction">${providerStatusMarkup()}<div class="story-history" id="story-history">${conversation.history.map(storyHistoryMessage).join('')}${isTyping ? typingMarkup() : ''}</div><div class="story-input-row"><input id="story-input" class="story-input" type="text" maxlength="260" placeholder="${esc(t('whatSay'))}"><button type="button" class="send-button" data-action="story-send" aria-label="${esc(t('send'))}" ${isTyping ? 'disabled' : ''}>${icon('send',18)}</button></div><div class="intent-options">${choices.map((choice, index) => `<button type="button" class="intent-button" data-action="story-option" data-text="${esc(choice)}"><span class="intent-icon">${['?', '↔', '…', '◇'][index] || '·'}</span><span>${esc(choice)}</span><span class="chev">›</span></button>`).join('')}</div><p class="story-hint">${esc(t('storyInputHint'))}</p>${journey.storyStep >= 2 && !isTyping ? `<button type="button" class="primary-button slate finish-story-button" data-action="finish-chapter">${esc(t('finishChapter'))}</button>` : ''}</div></section>`;
   }
 
   function dialogueCard(message) {
     const character = activeCharacter();
-    return `<div class="dialogue-card"><div class="dialogue-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="dialogue-copy"><strong>${esc(localText(character.name))}</strong>${message.provider === 'gemini' ? `<small class="npc-state-label">${esc(langText(`Gemini · ${message.emotion || message.expression || 'neutral'}`, `Gemini · ${message.emotion || message.expression || 'neutral'}`))}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.memoryRef ? `<span class="memory-reference">${icon('memory',10)}${esc(t('mentionMemory'))}</span>` : ''}${message.relationshipNote ? `<span class="relationship-shift-note">${esc(message.relationshipNote)}</span>` : ''}</div></div>`;
+    return `<div class="dialogue-card"><div class="dialogue-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="dialogue-copy"><strong>${esc(localText(character.name))}</strong>${message.provider === 'gemini' ? `<small class="npc-state-label">${esc(langText(`Gemini · ${message.emotion || message.expression || 'neutral'}`, `Gemini · ${message.emotion || message.expression || 'neutral'}`))}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.memoryRef ? `<span class="memory-reference">${icon('memory',10)}${esc(t('mentionMemory'))}</span>` : ''}${message.relationshipNote ? `<span class="relationship-shift-note">${esc(localText(message.relationshipNote))}</span>` : ''}</div></div>`;
   }
 
   function storyHistoryMessage(message) {
-    return `<div class="story-history-message ${message.role === 'user' ? 'user' : 'character'}">${esc(localText(message.text))}${message.relationshipNote ? `<small class="relationship-shift-note">${esc(message.relationshipNote)}</small>` : ''}</div>`;
+    return `<div class="story-history-message ${message.role === 'user' ? 'user' : 'character'}">${esc(localText(message.text))}${message.relationshipNote ? `<small class="relationship-shift-note">${esc(localText(message.relationshipNote))}</small>` : ''}</div>`;
   }
 
   function typingMarkup() {
@@ -597,7 +697,7 @@
     const system = message.sender === 'system';
     const senderName = self || system ? '' : echoContactName(message.sender);
     const typeLabel = message.type === 'voice' ? `▸ ${langText('语音留言', 'Voice note')}` : message.type === 'photo' ? `▧ ${langText('照片', 'Photo')}` : message.type === 'call' ? `☎ ${langText('通话记录', 'Call record')}` : '';
-    return `<div class="echo-message ${self ? 'self' : system ? 'system' : 'other'}">${thread.type === 'group' && senderName ? `<span class="echo-sender">${esc(senderName)}</span>` : ''}<div>${typeLabel ? `<small>${esc(typeLabel)}</small>` : ''}${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.relationshipNote ? `<small class="relationship-shift-note">${esc(message.relationshipNote)}</small>` : ''}<time>${esc(message.time || '')}</time></div></div>`;
+    return `<div class="echo-message ${self ? 'self' : system ? 'system' : 'other'}">${thread.type === 'group' && senderName ? `<span class="echo-sender">${esc(senderName)}</span>` : ''}<div>${typeLabel ? `<small>${esc(typeLabel)}</small>` : ''}${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.relationshipNote ? `<small class="relationship-shift-note">${esc(localText(message.relationshipNote))}</small>` : ''}<time>${esc(message.time || '')}</time></div></div>`;
   }
 
   function renderEchoTyping(thread) {
@@ -619,9 +719,9 @@
     const nightTrain = thread.id === 'lichuan' && terminal.pendingEvents.nightTrain === 'available';
     const pending = echoPendingReplies.has(thread.id);
     const journey = state.journeys?.[contactId];
-    const liveChoices = thread.type === 'private' && journey?.liveChoices?.length ? journey.liveChoices : null;
-    const intentSuggestions = liveChoices
-      ? liveChoices.map((choice) => `<button type="button" data-action="echolink-live-choice" data-text="${esc(choice.text)}">${esc(choice.text)}</button>`).join('')
+    const liveChoices = thread.type === 'private' ? (journey?.liveChoices || []).map(liveChoiceText).filter(Boolean) : [];
+    const intentSuggestions = liveChoices.length
+      ? liveChoices.map((choice) => `<button type="button" data-action="echolink-live-choice" data-text="${esc(choice)}">${esc(choice)}</button>`).join('')
       : `<button type="button" data-action="echolink-suggest" data-intent="friendship">${esc(langText('朋友式关心', 'Friendly care'))}</button><button type="button" data-action="echolink-suggest" data-intent="task">${esc(langText('询问事实与风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-suggest" data-intent="uncertain">${esc(langText('暂时不确定', 'Still uncertain'))}</button>`;
     return `<section class="app-screen echolink-screen echo-thread-screen" data-expression="${esc(journey?.liveExpression || 'neutral')}">${statusBar()}<div class="echolink-header thread"><button class="round-icon-button" type="button" data-action="echolink-close-thread" aria-label="Back">${icon('back',18)}</button><div><strong>${esc(echoThreadTitle(thread))}</strong><span>${esc(subtitle)}</span></div>${thread.id === 'shenyao' ? `<button class="round-icon-button" type="button" data-action="echolink-call">${icon('call',16)}</button>` : '<span></span>'}</div>${thread.type === 'private' ? providerStatusMarkup() : ''}<div class="echo-thread-body" id="echo-thread-body">${thread.messages.map((message)=>renderEchoMessage(message,thread)).join('')}${renderEchoTyping(thread)}${nightTrain && !pending ? `<section class="message-event-card"><span>${esc(langText('异步剧情 · 夜间列车', 'Async story · Night Train'))}</span><p>${esc(langText('黎川会根据你的行动继续自己的路线；不回复本身不会降低关系。', 'Li Chuan will continue his route based on your action; silence alone does not lower the bond.'))}</p><div><button type="button" data-action="echolink-invite" data-choice="join">${esc(langText('愿意同行', 'Go together'))}</button><button type="button" data-action="echolink-invite" data-choice="ask">${esc(langText('先问风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-invite" data-choice="alternative">${esc(langText('拒绝并提替代', 'Decline, offer alternative'))}</button></div></section>` : ''}</div><div class="echo-composer"><div class="intent-suggestions">${intentSuggestions}</div><label class="private-intent"><span>${esc(langText('主控真实意图 · NPC 不直接看到', 'Player intent · not directly shown to NPC'))}</span><select id="echo-private-intent"><option value="friendship" ${terminal.privateIntent === 'friendship' ? 'selected' : ''}>${esc(langText('朋友式关心', 'Friendship'))}</option><option value="hidden-romance" ${terminal.privateIntent === 'hidden-romance' ? 'selected' : ''}>${esc(langText('隐藏好感', 'Hidden romantic interest'))}</option><option value="uncertain" ${terminal.privateIntent === 'uncertain' ? 'selected' : ''}>${esc(langText('自己也不确定', 'Uncertain'))}</option><option value="task" ${terminal.privateIntent === 'task' ? 'selected' : ''}>${esc(langText('任务合作', 'Task cooperation'))}</option></select></label><div class="channel-switch">${availableChannels.map((channel)=>`<button type="button" class="${terminal.composerChannel === channel ? 'active' : ''}" data-action="echolink-channel" data-channel="${channel}">${channel === 'voice' ? icon('mic',14) : channel === 'photo' ? icon('image',14) : icon('message',14)}${esc(echoChannelLabel(channel))}</button>`).join('')}</div><div class="echo-input-row"><input id="echo-message-input" maxlength="300" ${pending ? 'disabled' : ''} placeholder="${esc(pending ? langText('对方正在输入…', 'Waiting for reply…') : langText('自由输入；建议只表达意图', 'Write freely; suggestions express intent only'))}"><button type="button" data-action="echolink-send" aria-label="${esc(t('send'))}" ${pending ? 'disabled' : ''}>${icon('send',17)}</button></div><button class="silence-button" type="button" data-action="echolink-silence" ${pending ? 'disabled' : ''}>${esc(langText('保持沉默／稍后回复', 'Stay silent / reply later'))}</button></div></section>`;
   }
@@ -709,7 +809,8 @@
     const character = activeCharacter();
     const journey = activeJourney();
     if (!character || !journey) return renderDiscover();
-    const quickPrompts = journey.liveChoices?.length ? journey.liveChoices.map((choice) => choice.text) : [
+    const livePrompts = (journey.liveChoices || []).map(liveChoiceText).filter(Boolean);
+    const quickPrompts = livePrompts.length ? livePrompts : [
       langText('问问今天的工作或旅程', 'Ask about today’s work or journey'),
       langText('继续讨论上次的分歧', 'Continue the previous disagreement'),
       langText('告诉对方我今天很累，只想被听见', 'Say I am tired and only want to be heard')
@@ -720,7 +821,7 @@
   function chatMessage(message) {
     if (message.role === 'user') return `<div class="chat-message-row user"><div class="chat-bubble">${esc(localText(message.text))}</div></div>`;
     const character = activeCharacter();
-    return `<div class="chat-message-row character"><div class="chat-mini-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="chat-bubble">${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}${esc(localText(message.text))}${message.memoryRef ? `<div class="chat-memory-ref">${icon('memory',10)}<span>${esc(t('mentionMemory'))}</span></div>` : ''}${message.relationshipNote ? `<div class="relationship-shift-note">${esc(message.relationshipNote)}</div>` : ''}<div class="message-actions"><button class="message-action" type="button" data-action="save-message-memory" data-message-id="${esc(message.id)}">${esc(t('saveEcho'))}</button></div></div></div>`;
+    return `<div class="chat-message-row character"><div class="chat-mini-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="chat-bubble">${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}${esc(localText(message.text))}${message.memoryRef ? `<div class="chat-memory-ref">${icon('memory',10)}<span>${esc(t('mentionMemory'))}</span></div>` : ''}${message.relationshipNote ? `<div class="relationship-shift-note">${esc(localText(message.relationshipNote))}</div>` : ''}<div class="message-actions"><button class="message-action" type="button" data-action="save-message-memory" data-message-id="${esc(message.id)}">${esc(t('saveEcho'))}</button></div></div></div>`;
   }
 
   function renderThreads() {
@@ -733,7 +834,7 @@
 
   function renderArchiveNode(archive, index) {
     const active = state.campaign.activeBranchId === archive.id;
-    return `<article class="archive-node ${active ? 'active' : ''}"><span class="node-line"></span><span class="node-dot"></span><div><strong>${esc(archive.label)}${active ? ` · ${esc(langText('当前分支', 'current branch'))}` : ''}</strong><small>${esc(archive.summary)}</small></div><span class="archive-actions"><button type="button" data-action="restore-archive" data-archive-id="${esc(archive.id)}">${esc(active ? langText('回到节点', 'Restore point') : langText('回溯', 'Rewind'))}</button>${active ? '' : `<button type="button" data-action="delete-archive" data-archive-id="${esc(archive.id)}" aria-label="${esc(langText('删除分支', 'Delete branch'))}">×</button>`}</span></article>`;
+    return `<article class="archive-node ${active ? 'active' : ''}"><span class="node-line"></span><span class="node-dot"></span><div><strong>${esc(localText(archive.label))}${active ? ` · ${esc(langText('当前分支', 'current branch'))}` : ''}</strong><small>${esc(localText(archive.summary))}</small></div><span class="archive-actions"><button type="button" data-action="restore-archive" data-archive-id="${esc(archive.id)}">${esc(active ? langText('回到节点', 'Restore point') : langText('回溯', 'Rewind'))}</button>${active ? '' : `<button type="button" data-action="delete-archive" data-archive-id="${esc(archive.id)}" aria-label="${esc(langText('删除分支', 'Delete branch'))}">×</button>`}</span></article>`;
   }
 
   function generatedThread(scene) {
@@ -1216,11 +1317,11 @@
     if (state.campaign?.mainline?.completed) unlocked.add('weaver-mainline');
     if (state.campaign?.weaver?.workshopUnlocked) unlocked.add('creator');
     let runningIndex = 0;
-    nav.innerHTML = `<div class="desktop-nav-title">${esc(t('demoNavigator'))}</div>${demoGroups.map((group) => `<section class="desktop-nav-group"><h3>${esc(langText(...group.title))}</h3><div class="desktop-nav-list">${group.steps.map(([screen,label]) => {
+    nav.innerHTML = `<div class="desktop-nav-title">${esc(t('demoNavigator'))}</div>${demoGroups.map((group) => `<section class="desktop-nav-group"><h3>${esc(langText(...group.title))}</h3><div class="desktop-nav-list">${group.steps.map(([screen, labelZh, labelEn]) => {
       runningIndex += 1;
       const complete = screen === 'title' || (['prologue','signal-scan','signal-confirm'].includes(screen) && Boolean(state.prologueChoice)) || (screen === 'first-rescue' && Boolean(state.selectedRescueChoice)) || (['first-contact','observatory-home'].includes(screen) && state.onboardingCompleted) || (screen === 'mainline-chapter' && Boolean(state.campaign?.mainline?.confirmedAnchorIds?.length)) || (screen === 'weaver-mainline' && Boolean(state.campaign?.weaver?.confirmedThreadIds?.length)) || (screen === 'creator' && Boolean(state.campaign?.weaver?.workshopUnlocked)) || (screen === 'archive-branches' && state.saves?.length) || (screen === 'echolink' && state.campaign?.echoLink?.hasOpened) || (screen === 'together' && journey?.generatedScenes?.length > 0);
       const locked = !unlocked.has(screen) && !complete;
-      return `<button class="desktop-nav-button ${activeRoute === screen ? 'active' : ''} ${complete ? 'complete' : ''} ${locked ? 'locked' : ''}" type="button" data-desktop-route="${screen}" ${locked ? 'disabled' : ''}><span class="desktop-nav-index">${String(runningIndex).padStart(2, '0')}</span><span class="desktop-nav-copy"><strong>${esc(label)}</strong><small>${esc(group === demoGroups[0] ? langText('核心叙事流程', 'Core story flow') : langText('保留功能页面', 'Existing feature page'))}</small></span><span class="desktop-nav-status"></span></button>`;
+      return `<button class="desktop-nav-button ${activeRoute === screen ? 'active' : ''} ${complete ? 'complete' : ''} ${locked ? 'locked' : ''}" type="button" data-desktop-route="${screen}" ${locked ? 'disabled' : ''}><span class="desktop-nav-index">${String(runningIndex).padStart(2, '0')}</span><span class="desktop-nav-copy"><strong>${esc(langText(labelZh, labelEn))}</strong><small>${esc(group === demoGroups[0] ? langText('核心叙事流程', 'Core story flow') : langText('保留功能页面', 'Existing feature page'))}</small></span><span class="desktop-nav-status"></span></button>`;
     }).join('')}</div></section>`).join('')}`;
     document.getElementById('principle-label').textContent = t('researchPrinciple');
     document.getElementById('principle-text').textContent = langText('角色不会因为被选择就爱上用户。关系来自记忆、理解、分歧、边界和共同经历。', 'A character does not fall in love because they were selected. Relationships grow through memory, understanding, disagreement, boundaries, and shared experience.');
@@ -1371,7 +1472,7 @@
         onboardingCompleted: false
       }
     }].slice(-12);
-    if (state.archives.length < 6) createArchive(langText(`首次救援 · ${localText(characters[id].name)}`, `First rescue · ${characters[id].name.en}`));
+    if (state.archives.length < 6) createArchive(bilingual(`首次救援 · ${characters[id].name.zh}`, `First rescue · ${characters[id].name.en}`));
     state.currentBranchId = state.campaign.activeBranchId;
     state.screen = 'event-result';
     state.resumeScreen = 'event-result';
@@ -1740,8 +1841,8 @@
     if (!state.campaign.knowledge.some((item) => item.id === 'knowledge-first-free-thread')) {
       state.campaign.knowledge.push({
         id: 'knowledge-first-free-thread',
-        text: langText(`你为${progress.tutorialNpc.name}建立了${progress.tutorialWorld.name}；角色拥有身份、愿望、记忆、边界与可持续的世界。`, `You established ${progress.tutorialWorld.name} for ${progress.tutorialNpc.name}; the character has identity, desire, memory, boundaries, and a sustainable world.`),
-        source: langText('EchoLoom · 第一次创生', 'EchoLoom · first creation'), confidence: 'high', knownBy: ['player', ...characterIds, 'sui']
+        text: bilingual(`你为${progress.tutorialNpc.name}建立了${progress.tutorialWorld.name}；角色拥有身份、愿望、记忆、边界与可持续的世界。`, `You established ${progress.tutorialWorld.name} for ${progress.tutorialNpc.name}; the character has identity, desire, memory, boundaries, and a sustainable world.`),
+        source: bilingual('EchoLoom · 第一次创生', 'EchoLoom · first creation'), confidence: 'high', knownBy: ['player', ...characterIds, 'sui']
       });
     }
     render();
@@ -1776,7 +1877,7 @@
   }
 
   function startSignalBranch() {
-    if (state.archives.length < 6) createArchive(langText('返回五处信号前', 'Before returning to five signals'));
+    if (state.archives.length < 6) createArchive(bilingual('返回五处信号前', 'Before returning to five signals'));
     const nextId = `branch-${Date.now()}-new`;
     state.journeys = {};
     state.campaign = createCampaign();
@@ -1890,10 +1991,10 @@
     journey.routeFlags.push('concealed-copy-revealed');
     const hiddenFlag = state.campaign.echoLink.hiddenFlags.find((flag) => flag.id === 'zhoutang-concealed-copy');
     if (hiddenFlag) hiddenFlag.status = 'revealed';
-    result.response = `${langText('终端刚刚校验出一份暗中复制的完整日志。你本来可以直接拒绝；表面同意让我失去了判断风险的机会。访问权限现在降到最低。', 'The terminal just verified a secret copy of the full log. You could have refused directly; outward agreement denied me the chance to judge the risk. Access is now reduced to minimum.')} ${result.response}`;
+    result.response = prependLocalized(bilingual('终端刚刚校验出一份暗中复制的完整日志。你本来可以直接拒绝；表面同意让我失去了判断风险的机会。访问权限现在降到最低。', 'The terminal just verified a secret copy of the full log. You could have refused directly; outward agreement denied me the chance to judge the risk. Access is now reduced to minimum.'), result.response);
     result.relationshipDelta = { ...result.relationshipDelta, trust: Number(result.relationshipDelta?.trust || 0) - 2.5, safety: Number(result.relationshipDelta?.safety || 0) - 1.5, strain: Number(result.relationshipDelta?.strain || 0) + 2 };
     result.behaviourTags = [...(result.behaviourTags || []), 'deceptionRevealed'];
-    journey.memories.unshift({ id: `zt-reveal-${Date.now()}`, section: 'unresolved', text: langText('暗中复制的完整日志被终端发现，周棠将访问权限降到最低', 'The terminal exposed the secret full-log copy, and Zhou Tang reduced access to minimum'), source: langText('第一章 · 权限复核', 'Chapter One · Access review'), pinned: false, permanent: true, type: 'event', worldId: 'station', branchId: state.campaign.activeBranchId, providedBy: 'echolink', confidence: 'high', emotionalIntensity: 3, private: false, obsolete: false, crossWorld: false });
+    journey.memories.unshift({ id: `zt-reveal-${Date.now()}`, section: 'unresolved', text: bilingual('暗中复制的完整日志被终端发现，周棠将访问权限降到最低', 'The terminal exposed the secret full-log copy, and Zhou Tang reduced access to minimum'), source: bilingual('第一章 · 权限复核', 'Chapter One · Access review'), pinned: false, permanent: true, type: 'event', worldId: 'station', branchId: state.campaign.activeBranchId, providedBy: 'echolink', confidence: 'high', emotionalIntensity: 3, private: false, obsolete: false, crossWorld: false });
     return result;
   }
 
@@ -2018,7 +2119,7 @@
 
     if (thread.type === 'group') {
       const knownBy = thread.participantIds.filter((id) => id !== 'player');
-      state.campaign.knowledge.push({ id: `knowledge-group-${Date.now()}`, text: clean, source: langText('EchoLink · 第七异常观测小组', 'EchoLink · Seventh Anomaly Group'), confidence: 'self-reported', knownBy: ['player', ...knownBy] });
+      state.campaign.knowledge.push({ id: `knowledge-group-${Date.now()}`, text: clean, source: bilingual('EchoLink · 第七异常观测小组', 'EchoLink · Seventh Anomaly Group'), confidence: 'self-reported', knownBy: ['player', ...knownBy] });
       const lower = clean.toLowerCase();
       const speaker = clean.includes('隐私') || clean.includes('权限') || clean.includes('日志') || ['privacy', 'access', 'permission', 'log'].some((word) => lower.includes(word))
         ? 'zhoutang'
@@ -2028,11 +2129,11 @@
             ? 'shenyao'
             : clean.includes('记忆') || lower.includes('memory') ? 'qian' : 'lichuan';
       const replies = {
-        qian: langText('收到。我会把这条消息和原始副本分开保存，避免把推测写成事实。', 'Received. I will store this separately from the original copy so inference is not recorded as fact.'),
-        shenyao: langText('已标记为主控自述。还需要独立来源才能提高可信度。', 'Marked as player testimony. An independent source is still required to raise confidence.'),
-        lichuan: langText('我看见了。先不转发，等你说清楚希望谁知道。', 'I saw it. I will not forward it until you say who should know.'),
-        zhoutang: langText('先确认这条信息的可见范围。与任务无关的私人字段不要放进群组日志。', 'Confirm the visibility scope first. Private fields unrelated to the task should not enter the group log.'),
-        wensheng: langText('我先把它当成一个版本，而不是结论。这里的人如果有不同说法，也应该被保留下来。', 'I will treat it as one version, not a conclusion. If the people here disagree, their versions should remain too.')
+        qian: bilingual('收到。我会把这条消息和原始副本分开保存，避免把推测写成事实。', 'Received. I will store this separately from the original copy so inference is not recorded as fact.'),
+        shenyao: bilingual('已标记为主控自述。还需要独立来源才能提高可信度。', 'Marked as player testimony. An independent source is still required to raise confidence.'),
+        lichuan: bilingual('我看见了。先不转发，等你说清楚希望谁知道。', 'I saw it. I will not forward it until you say who should know.'),
+        zhoutang: bilingual('先确认这条信息的可见范围。与任务无关的私人字段不要放进群组日志。', 'Confirm the visibility scope first. Private fields unrelated to the task should not enter the group log.'),
+        wensheng: bilingual('我先把它当成一个版本，而不是结论。这里的人如果有不同说法，也应该被保留下来。', 'I will treat it as one version, not a conclusion. If the people here disagree, their versions should remain too.')
       };
       scheduleEchoReply(thread, speaker, state.journeys?.[speaker], 'text', () => {
         thread.messages.push({ id: `el-g-${Date.now()}`, sender: speaker, type: 'text', text: replies[speaker], time: echoTime() });
@@ -2041,7 +2142,7 @@
     }
 
     if (thread.type === 'delayed') {
-      thread.messages.push({ id: `el-d-${Date.now()}`, sender: 'system', type: 'system', text: langText('消息已离开当前世界线；预计送达时间未知。', 'Message left the current worldline; delivery time is unknown.'), time: '⌁' });
+      thread.messages.push({ id: `el-d-${Date.now()}`, sender: 'system', type: 'system', text: bilingual('消息已离开当前世界线；预计送达时间未知。', 'Message left the current worldline; delivery time is unknown.'), time: '⌁' });
       terminal.pendingEvents.delayedW17 = 'reply-sent';
       return render();
     }
@@ -2050,8 +2151,8 @@
     const journey = state.journeys?.[contactId];
     if (!journey) {
       const sideReply = contactId === 'sui'
-        ? langText('我收到了。这里的字会消失，但你留下的理由还在。', 'I received it. The words disappear here, but the reason you left remains.')
-        : langText('已登记。若涉及失联人员，请附上最后出现的世界编号。', 'Logged. For a missing person, include the last known world number.');
+        ? bilingual('我收到了。这里的字会消失，但你留下的理由还在。', 'I received it. The words disappear here, but the reason you left remains.')
+        : bilingual('已登记。若涉及失联人员，请附上最后出现的世界编号。', 'Logged. For a missing person, include the last known world number.');
       scheduleEchoReply(thread, contactId, null, channel, () => {
         thread.messages.push({ id: `el-side-${Date.now()}`, sender: contactId, type: 'text', text: sideReply, time: echoTime() });
       });
@@ -2065,7 +2166,7 @@
     journey.chatMessages.push({ id: syncedUserMessageId, role: 'user', text: clean, channel, privateIntent: terminal.privateIntent });
     const delayed = contactId === 'shenyao' && channel === 'voice';
     if (delayed) {
-      thread.messages.push({ id: `el-pending-${Date.now()}`, sender: 'system', type: 'system', text: langText('沈曜正在执行观测任务。语音已送达，预计 17 分钟后可处理；未使用紧急标记。', 'Shen Yao is observing. Voice delivered; estimated response in 17 minutes. Emergency flag not used.'), time: echoTime() });
+      thread.messages.push({ id: `el-pending-${Date.now()}`, sender: 'system', type: 'system', text: bilingual('沈曜正在执行观测任务。语音已送达，预计 17 分钟后可处理；未使用紧急标记。', 'Shen Yao is observing. Voice delivered; estimated response in 17 minutes. Emergency flag not used.'), time: echoTime() });
       updateCommunicationPulse(journey, window.EchoEngine.chatReply(clean, engineState()), channel, false);
       return render();
     }
@@ -2090,18 +2191,18 @@
     const journey = state.journeys.lichuan;
     if (!thread || !journey || echoPendingReplies.has(thread.id) || terminal.pendingEvents.nightTrain !== 'available') return;
     const outcomes = {
-      join: { user: langText('行动意图：立即同行', 'Action intent: go together now'), reply: langText('好。定位发你，但你随时可以改主意。', 'All right. I sent the location, and you can change your mind at any point.'), delta: { familiarity: 1, reciprocity: .75, compatibility: .75 } },
-      ask: { user: langText('行动意图：先确认风险与目的地', 'Action intent: ask about risk and destination first'), reply: langText('合理。风险三项，退路两条。我先发完整路线，你看完再决定。', 'Reasonable. Three risks, two exits. I will send the full route before you decide.'), delta: { trust: .75, safety: .75 } },
-      alternative: { user: langText('行动意图：今晚拒绝，提出明日下午调查旧站台', 'Action intent: decline tonight and propose investigating tomorrow'), reply: langText('可以。拒绝不是失约——明天下午这件事，我等你确认。', 'That works. Refusal is not breaking a promise—I will wait for your confirmation tomorrow.'), delta: { safety: .5 } }
+      join: { user: bilingual('行动意图：立即同行', 'Action intent: go together now'), reply: bilingual('好。定位发你，但你随时可以改主意。', 'All right. I sent the location, and you can change your mind at any point.'), delta: { familiarity: 1, reciprocity: .75, compatibility: .75 } },
+      ask: { user: bilingual('行动意图：先确认风险与目的地', 'Action intent: ask about risk and destination first'), reply: bilingual('合理。风险三项，退路两条。我先发完整路线，你看完再决定。', 'Reasonable. Three risks, two exits. I will send the full route before you decide.'), delta: { trust: .75, safety: .75 } },
+      alternative: { user: bilingual('行动意图：今晚拒绝，提出明日下午调查旧站台', 'Action intent: decline tonight and propose investigating tomorrow'), reply: bilingual('可以。拒绝不是失约——明天下午这件事，我等你确认。', 'That works. Refusal is not breaking a promise—I will wait for your confirmation tomorrow.'), delta: { safety: .5 } }
     };
     const outcome = outcomes[choice];
     if (!outcome) return;
     thread.messages.push({ id: `el-event-u-${Date.now()}`, sender: 'player', type: 'system', text: outcome.user, time: echoTime() });
     applyRelationshipDelta(outcome.delta, journey);
     if (choice === 'alternative') {
-      const commitment = { id: `promise-old-platform-${Date.now()}`, with: 'lichuan', due: 'next-afternoon', status: 'pending', text: langText('明天下午调查旧站台', 'Investigate the old platform tomorrow afternoon'), branchId: state.campaign.activeBranchId };
+      const commitment = { id: `promise-old-platform-${Date.now()}`, with: 'lichuan', due: 'next-afternoon', status: 'pending', text: bilingual('明天下午调查旧站台', 'Investigate the old platform tomorrow afternoon'), branchId: state.campaign.activeBranchId };
       terminal.commitments.push(commitment);
-      journey.memories.unshift({ id: commitment.id, section: 'pinned', text: commitment.text, source: langText('EchoLink · 黎川邀请', 'EchoLink · Li Chuan invitation'), pinned: true, permanent: true, type: 'promiseBoundary', worldId: state.campaign.currentWorldId, branchId: state.campaign.activeBranchId, providedBy: 'player', confidence: 'high', emotionalIntensity: 2, private: false, obsolete: false, crossWorld: false });
+      journey.memories.unshift({ id: commitment.id, section: 'pinned', text: commitment.text, source: bilingual('EchoLink · 黎川邀请', 'EchoLink · Li Chuan invitation'), pinned: true, permanent: true, type: 'promiseBoundary', worldId: state.campaign.currentWorldId, branchId: state.campaign.activeBranchId, providedBy: 'player', confidence: 'high', emotionalIntensity: 2, private: false, obsolete: false, crossWorld: false });
     }
     terminal.pendingEvents.nightTrain = choice;
     scheduleEchoReply(thread, 'lichuan', journey, 'text', () => {
@@ -2115,9 +2216,9 @@
     if (!thread) return;
     if (thread.id === 'lichuan' && terminal.pendingEvents.nightTrain === 'available') {
       terminal.pendingEvents.nightTrain = 'departed-without-reply';
-      thread.messages.push({ id: `el-silence-${Date.now()}`, sender: 'system', type: 'system', text: langText('你暂时没有回复。黎川按自己的决定出发；普通沉默没有降低关系值。', 'You did not reply yet. Li Chuan left by his own choice; ordinary silence did not lower the relationship.'), time: echoTime() });
+      thread.messages.push({ id: `el-silence-${Date.now()}`, sender: 'system', type: 'system', text: bilingual('你暂时没有回复。黎川按自己的决定出发；普通沉默没有降低关系值。', 'You did not reply yet. Li Chuan left by his own choice; ordinary silence did not lower the relationship.'), time: echoTime() });
     } else {
-      thread.messages.push({ id: `el-silence-${Date.now()}`, sender: 'system', type: 'system', text: langText('已标记为稍后回复。没有明确承诺或紧急责任，因此关系不受惩罚。', 'Marked for later reply. With no explicit promise or emergency duty, the relationship is not penalised.'), time: echoTime() });
+      thread.messages.push({ id: `el-silence-${Date.now()}`, sender: 'system', type: 'system', text: bilingual('已标记为稍后回复。没有明确承诺或紧急责任，因此关系不受惩罚。', 'Marked for later reply. With no explicit promise or emergency duty, the relationship is not penalised.'), time: echoTime() });
     }
     render();
   }
@@ -2128,9 +2229,9 @@
     const journey = promise ? state.journeys?.[promise.with] : null;
     if (!promise || !journey) return;
     const results = {
-      fulfilled: { delta: { trust: 1, commitment: .5 }, text: langText('你按约定来到旧站台。信任与承诺在行为发生后结算。', 'You arrived at the old platform as promised. Trust and commitment were settled after the action.') },
-      explained: { delta: {}, text: langText('你提前说明无法前来。约定已调整，信任没有因缺席下降。', 'You explained in advance that you could not come. The plan changed without reducing trust.') },
-      missed: { delta: { trust: -1.5, strain: 1 }, text: langText('你没有出现，也没有说明。黎川记录了这次失约；普通沉默与明确承诺的后果不同。', 'You did not arrive or explain. Li Chuan recorded the broken promise; ordinary silence and an explicit commitment have different consequences.') }
+      fulfilled: { delta: { trust: 1, commitment: .5 }, text: bilingual('你按约定来到旧站台。信任与承诺在行为发生后结算。', 'You arrived at the old platform as promised. Trust and commitment were settled after the action.') },
+      explained: { delta: {}, text: bilingual('你提前说明无法前来。约定已调整，信任没有因缺席下降。', 'You explained in advance that you could not come. The plan changed without reducing trust.') },
+      missed: { delta: { trust: -1.5, strain: 1 }, text: bilingual('你没有出现，也没有说明。黎川记录了这次失约；普通沉默与明确承诺的后果不同。', 'You did not arrive or explain. Li Chuan recorded the broken promise; ordinary silence and an explicit commitment have different consequences.') }
     };
     const result = results[outcome];
     if (!result) return;
@@ -2139,7 +2240,15 @@
     applyRelationshipDelta(result.delta, journey);
     terminal.conversations[promise.with]?.messages.push({ id: `el-promise-${Date.now()}`, sender: 'system', type: 'system', text: result.text, time: echoTime() });
     const memory = journey.memories.find((item) => item.id === promise.id);
-    if (memory) memory.text = `${localText(promise.text)} · ${langText(outcome === 'fulfilled' ? '已兑现' : outcome === 'explained' ? '已提前说明变更' : '失约未解释', outcome === 'fulfilled' ? 'fulfilled' : outcome === 'explained' ? 'change explained early' : 'missed without explanation')}`;
+    if (memory) {
+      const promiseText = localizedPair(localText(promise.text), promise.text, state.language);
+      const status = outcome === 'fulfilled'
+        ? bilingual('已兑现', 'fulfilled')
+        : outcome === 'explained'
+          ? bilingual('已提前说明变更', 'change explained early')
+          : bilingual('失约未解释', 'missed without explanation');
+      memory.text = bilingual(`${promiseText.zh} · ${status.zh}`, `${promiseText.en} · ${status.en}`);
+    }
     render();
   }
 
@@ -2149,9 +2258,9 @@
     const journey = state.journeys?.shenyao;
     if (!thread || !journey) return;
     if (!journey.onboardingComplete) {
-      thread.messages.push({ id: `el-call-pending-${Date.now()}`, sender: 'system', type: 'system', text: langText('实时通话尚未开放。可发送语音留言；紧急标记仅用于真实危机。', 'Live calls are not available yet. You may leave voice; emergency flags are for genuine crises only.'), time: echoTime() });
+      thread.messages.push({ id: `el-call-pending-${Date.now()}`, sender: 'system', type: 'system', text: bilingual('实时通话尚未开放。可发送语音留言；紧急标记仅用于真实危机。', 'Live calls are not available yet. You may leave voice; emergency flags are for genuine crises only.'), time: echoTime() });
     } else {
-      thread.messages.push({ id: `el-call-${Date.now()}`, sender: 'system', type: 'call', text: langText('通话 02:17 · 双方确认这次讨论只处理第 17 秒的数据。', 'Call 02:17 · Both agreed to discuss only the seventeenth-second data.'), time: echoTime() });
+      thread.messages.push({ id: `el-call-${Date.now()}`, sender: 'system', type: 'call', text: bilingual('通话 02:17 · 双方确认这次讨论只处理第 17 秒的数据。', 'Call 02:17 · Both agreed to discuss only the seventeenth-second data.'), time: echoTime() });
       journey.communicationPulse.channelComfort.call = Math.min(10, Number(journey.communicationPulse.channelComfort.call || 0) + .5);
     }
     render();
@@ -2236,7 +2345,7 @@
     if (!journey || !message) return;
     const text = localText(message.text);
     if (!journey.memories.some((memory) => localText(memory.text) === text)) {
-      journey.memories.unshift({ id: `m-${Date.now()}`, section: 'pinned', text, source: langText('聊天 · 今天', 'Chat · Today'), pinned: true, permanent: true, type: 'event', worldId: state.campaign.currentWorldId, branchId: state.campaign.activeBranchId, providedBy: 'player', confidence: 'high', emotionalIntensity: 2, private: false, obsolete: false, crossWorld: false });
+      journey.memories.unshift({ id: `m-${Date.now()}`, section: 'pinned', text, source: bilingual('聊天 · 今天', 'Chat · Today'), pinned: true, permanent: true, type: 'event', worldId: state.campaign.currentWorldId, branchId: state.campaign.activeBranchId, providedBy: 'player', confidence: 'high', emotionalIntensity: 2, private: false, obsolete: false, crossWorld: false });
     }
     toast(t('memorySaved'));
     render();
@@ -2270,7 +2379,7 @@
       const memory = journey.memories.find((item) => item.id === modalContext.memoryId);
       if (memory) { memory.text = text; memory.textKey = null; }
     } else {
-      journey.memories.unshift({ id: `m-${Date.now()}`, section: 'pinned', text, source: langText('手动添加 · 今天', 'Manually added · Today'), pinned: true, permanent: true, type: 'fact', worldId: state.campaign.currentWorldId, branchId: state.campaign.activeBranchId, providedBy: 'player', confidence: 'medium', emotionalIntensity: 1, private: false, obsolete: false, crossWorld: false });
+      journey.memories.unshift({ id: `m-${Date.now()}`, section: 'pinned', text, source: bilingual('手动添加 · 今天', 'Manually added · Today'), pinned: true, permanent: true, type: 'fact', worldId: state.campaign.currentWorldId, branchId: state.campaign.activeBranchId, providedBy: 'player', confidence: 'medium', emotionalIntensity: 1, private: false, obsolete: false, crossWorld: false });
     }
     closeModal();
     render();
@@ -2342,12 +2451,12 @@
     const parentId = state.campaign.activeBranchId || 'root';
     const snapshotCampaign = JSON.parse(JSON.stringify(state.campaign));
     snapshotCampaign.activeBranchId = id;
-    const activeName = activeCharacter() ? localText(activeCharacter().name) : langText('观测站', 'Station');
+    const activeName = activeCharacter()?.name || bilingual('观测站', 'Station');
     const archive = {
       id,
       parentId,
-      label: label || langText(`档案节点 ${state.archives.length + 1}`, `Archive node ${state.archives.length + 1}`),
-      summary: langText(`${activeName} · ${state.campaign.clues.length} 条线索 · 洞察 ${state.campaign.observationInsight}`, `${activeName} · ${state.campaign.clues.length} clues · insight ${state.campaign.observationInsight}`),
+      label: label || bilingual(`档案节点 ${state.archives.length + 1}`, `Archive node ${state.archives.length + 1}`),
+      summary: bilingual(`${activeName.zh} · ${state.campaign.clues.length} 条线索 · 洞察 ${state.campaign.observationInsight}`, `${activeName.en} · ${state.campaign.clues.length} clues · insight ${state.campaign.observationInsight}`),
       createdAt: new Date().toISOString(),
       snapshot: {
         activeCharacterId: state.activeCharacterId,
@@ -2369,7 +2478,7 @@
     }
     clearEchoPendingReplies();
     const returnRoute = state.screen === 'echolink' ? 'echolink' : 'observatory-home';
-    createArchive(langText('回溯前的时间线', 'Timeline before rewind'));
+    createArchive(bilingual('回溯前的时间线', 'Timeline before rewind'));
     state.activeCharacterId = target.snapshot.activeCharacterId;
     state.journeys = JSON.parse(JSON.stringify(target.snapshot.journeys));
     state.campaign = JSON.parse(JSON.stringify(target.snapshot.campaign));
@@ -2383,7 +2492,7 @@
     if (state.campaign.activeBranchId === archiveId) return toast(langText('不能删除当前分支。', 'The current branch cannot be deleted.'));
     const archive = state.archives.find((item) => item.id === archiveId);
     if (!archive) return;
-    if (!window.confirm(langText(`删除“${archive.label}”？这个分支节点无法恢复。`, `Delete “${archive.label}”? This branch node cannot be recovered.`))) return;
+    if (!window.confirm(langText(`删除“${localText(archive.label)}”？这个分支节点无法恢复。`, `Delete “${localText(archive.label)}”? This branch node cannot be recovered.`))) return;
     state.archives = state.archives.filter((item) => item.id !== archiveId);
     render();
   }
@@ -2392,7 +2501,7 @@
     const event = state.campaign.sharedEvent;
     if (event.status === 'resolved') return;
     if (state.archives.length >= 6) return toast(langText('事件前需要创建可回溯节点；请先删除一个非当前分支。', 'A rewind point is required before this event; delete a non-current branch first.'));
-    createArchive(langText('许澄作出选择前', 'Before Xu Cheng’s choice'));
+    createArchive(bilingual('许澄作出选择前', 'Before Xu Cheng’s choice'));
     const rationale = document.getElementById('event-reason')?.value.trim() || '';
     const impacts = {
       protect: { qian: { trust: 1, safety: 1 }, shenyao: { strain: 1, compatibility: -0.5 }, lichuan: { reciprocity: 1 }, zhoutang: { safety: .5, reciprocity: .5 }, wensheng: { intimacy: 1, safety: 1 } },
@@ -2425,8 +2534,8 @@
     state.campaign.observationInsight += 1;
     const eventKnowledge = {
       id: `knowledge-sui-${decision}`,
-      text: langText(`你在“许澄的选择”事件中支持了：${decision}。五人都在场，但最终决定属于许澄。`, `In Xu Cheng’s Choice, you supported: ${decision}. All five witnessed it, but the final decision belonged to Xu Cheng.`),
-      source: langText('命运观测站 · 共同事件', 'Fate Observation Station · shared event'),
+      text: bilingual(`你在“许澄的选择”事件中支持了：${decision}。五人都在场，但最终决定属于许澄。`, `In Xu Cheng’s Choice, you supported: ${decision}. All five witnessed it, but the final decision belonged to Xu Cheng.`),
+      source: bilingual('命运观测站 · 共同事件', 'Fate Observation Station · shared event'),
       confidence: 'high',
       knownBy: ['player', ...characterIds]
     };
@@ -2775,7 +2884,7 @@
     if (event.target.id === 'player-name-input') { event.preventDefault(); handleAction(event.target.closest('.app-screen')?.querySelector('[data-action="save-player-name"]')); }
   });
   app.addEventListener('change', (event) => {
-    if (event.target.id === 'language-select') { state.language = event.target.value; render(); }
+    if (event.target.id === 'language-select') setInterfaceLanguage(event.target.value);
     if (event.target.id === 'frequency-select') { state.settings.frequency = event.target.value; render(); }
     if (event.target.id === 'ai-mode-select') { state.settings.aiMode = ['auto', 'live', 'offline'].includes(event.target.value) ? event.target.value : 'auto'; render(); }
     if (event.target.id === 'echo-private-intent') { state.campaign.echoLink.privateIntent = event.target.value; }
@@ -2786,7 +2895,7 @@
     const control = event.target.closest('[data-desktop-action]');
     if (!control) return;
     const action = control.dataset.desktopAction;
-    if (action === 'language') { state.language = state.language === 'zh' ? 'en' : 'zh'; render(); }
+    if (action === 'language') setInterfaceLanguage(state.language === 'zh' ? 'en' : 'zh');
     if (action === 'export') exportRelationship();
     if (action === 'reset') resetPrototype();
     if (action === 'focus') { demoShell.classList.toggle('focus-mode'); fitPhone(); }
@@ -2803,11 +2912,16 @@
   });
 
   function fitPhone() {
-    if (window.innerWidth <= 820) { phoneFrame.style.transform = ''; return; }
+    const stage = document.querySelector('.phone-stage');
+    if (window.innerWidth <= 820) {
+      phoneFrame.style.transform = '';
+      stage.style.minHeight = '';
+      stage.style.minWidth = '';
+      return;
+    }
     const availableHeight = window.innerHeight - 58;
     const scale = Math.min(1, Math.max(.68, availableHeight / 852));
     phoneFrame.style.transform = `scale(${scale})`;
-    const stage = document.querySelector('.phone-stage');
     stage.style.minHeight = `${Math.ceil(852 * scale + 28)}px`;
     stage.style.minWidth = `${Math.ceil(393 * scale + 20)}px`;
   }
@@ -2815,6 +2929,9 @@
   window.addEventListener('resize', fitPhone);
   fitPhone();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch((error) => console.info('Service worker skipped:', error));
-  window.EchoApiEngine?.initialize?.().then(() => render());
+  window.EchoApiEngine?.initialize?.().then(() => {
+    render();
+    localizeLegacyGeneratedText(state.language, ++languageLocalizationToken);
+  });
   render();
 })();

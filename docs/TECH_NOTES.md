@@ -4,10 +4,10 @@
 
 - Static HTML, CSS, and JavaScript.
 - No build step and no third-party runtime dependency.
-- State is stored in browser `localStorage` under `echoloom.demo.v2` and migrates through schema version 10. Automatic mode uses Gemini when the local server reports a configured key and otherwise remains offline.
+- State is stored in browser `localStorage` under `echoloom.demo.v2` and migrates through schema version 11. Automatic mode uses Gemini when the local server reports a configured key and otherwise remains offline.
 - The default scene generator is deterministic and keyword-based. Optional live events can request a server-generated FLUX background only after `scene.changed`, with a SHA-256 disk cache and packaged fallback.
 - Content is separated into `app/data.js` to keep bilingual copy, character profiles, journey defaults, and scene metadata editable.
-- Schema version 10 stores separate journeys for Qi An, Shen Yao, Li Chuan, Zhou Tang, and Wen Sheng plus automatic/live/offline preference, live story/scene metadata, opening decisions, EchoLink, shared campaign, and recoverable archive state.
+- Schema version 11 stores separate journeys for Qi An, Shen Yao, Li Chuan, Zhou Tang, and Wen Sheng plus automatic/live/offline preference, bilingual generated dialogue/choices/memories, live story/scene metadata, opening decisions, EchoLink, shared campaign, and recoverable archive state.
 - The app uses a small state machine rather than URL routing.
 - Opening chapters and generated scenes use a cinematic spotlight only before the first player message. Once conversation begins, every character and player message stays in one insertion-ordered history so a reply cannot appear above the message that triggered it.
 - The service worker caches the prototype when served over HTTP.
@@ -31,12 +31,14 @@ The implemented feasibility architecture keeps the browser UI separate from ever
 1. Browser sends the latest user message plus a small structured relationship state to a secure backend.
 2. Backend retrieves only relevant, non-obsolete memories for the selected character.
 3. Backend applies the official character core, current life state, and event constraints.
-4. Gemini produces a structured Game Event containing concise dialogue and bounded suggestions.
+4. Gemini produces a structured Game Event containing concise dialogue, bounded suggestions, saved-memory content, and faithful Chinese/English versions of each user-visible generated field.
 5. Backend validates shape, enums, lengths, deltas, canonical story state, and allowed flags; optional Supabase persistence is atomic.
 6. Eligible memories enter a visible, source-linked local timeline where the user can edit applicable facts/events or delete any memory.
 7. A separate Cloudflare call occurs only for an actual scene change and reuses the fingerprint cache.
 
 The complete transcript and editable memory archive remain local, while each live request uses a fixed byte-bounded rolling context. Current-topic and pinned memories are preferred, so conversation history can grow without making the request grow indefinitely. Oversized requests retry once with an emergency compact context; short-lived Gemini rate limits and provider errors retry within the original timeout. A primary-model 429 automatically tries the configured stable Flash-Lite fallback. A final failure falls back only for that turn and does not disable the next live attempt.
+
+Runtime-generated NPC and system records are stored bilingually. User-authored strings remain untouched. When an older archive contains NPC/system-generated text in only one language, `POST /api/localize` translates that generated content after startup or a language switch and the browser caches the pair locally; this endpoint is skipped in offline mode.
 
 The offline engine remains available for classroom demos and automated testing. Missing configuration, timeouts, rate limits, malformed output, persistence failures, and scene failures have typed recovery paths.
 

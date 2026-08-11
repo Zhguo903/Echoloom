@@ -20,7 +20,7 @@ cp .env.example .env
 npm start
 ```
 
-- Gemini returns a validated structured Game Event for Story, Chat, generated-scene chat, and private EchoLink replies.
+- Gemini returns a validated bilingual structured Game Event for Story, Chat, generated-scene chat, and private EchoLink replies. Dialogue, intent suggestions, and saved-memory content can rerender immediately when the interface language changes.
 - Supabase can persist isolated character context, relationship changes, story state, messages, and meaningful memories.
 - Cloudflare Workers AI can generate a background only when a validated event changes the scene; identical prompts reuse a local fingerprint cache.
 - Long conversations keep the full local transcript while sending only a bounded recent-and-relevant context window. Oversized requests retry automatically; a primary-model rate limit switches to a stable Flash-Lite fallback. A final provider failure falls back for that turn and the next message tries live mode again. Secrets remain in `.env` and never enter browser JavaScript.
@@ -41,7 +41,7 @@ npm test
 
 ## What is interactive
 
-The prototype now opens with a brand/title sequence and a persistent visual-novel onboarding: the 17-second outage, player naming, a five-signal orbital scan, one three-character rescue, a qualitative result, EchoLink activation, first free-text contact, the formal Observatory home, and isolated branch creation. EchoLink remains a second main interface with Messages, Contacts, Moments, Bonds, and Archive tabs; story-dependent permissions; private/group/delayed threads; avatar-based typing feedback; relationship-aware reply timing; and branch-aware history. Existing relationship analysis, shared events, typed and source-linked memories, world/scene generation, custom NPC creation, bilingual UI, and schema-v10 JSON export/import remain available from the five-part primary navigation and desktop feature-demo group. Schema v10 automatically uses Gemini when a server key is configured while retaining a force-offline setting.
+The prototype now opens with a brand/title sequence and a persistent visual-novel onboarding: the 17-second outage, player naming, a five-signal orbital scan, one three-character rescue, a qualitative result, EchoLink activation, first free-text contact, the formal Observatory home, and isolated branch creation. EchoLink remains a second main interface with Messages, Contacts, Moments, Bonds, and Archive tabs; story-dependent permissions; private/group/delayed threads; avatar-based typing feedback; relationship-aware reply timing; and branch-aware history. Existing relationship analysis, shared events, typed and source-linked memories, world/scene generation, custom NPC creation, bilingual UI, and schema-v11 JSON export/import remain available from the five-part primary navigation and desktop feature-demo group. Schema v11 automatically uses Gemini when a server key is configured, stores new generated content bilingually, upgrades schema-v10 archives without data loss, and retains a force-offline setting. Player-authored text is always preserved exactly as entered.
 
 Relationship dimensions are never presented as an affection score, and attraction or player wording never confirms romance, exclusivity, or consent automatically.
 

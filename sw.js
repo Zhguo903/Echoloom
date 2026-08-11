@@ -1,4 +1,4 @@
-const CACHE = 'echoloom-demo-v57';
+const CACHE = 'echoloom-demo-v62';
 const ASSETS = [
   './',
   './index.html',

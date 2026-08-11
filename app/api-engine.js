@@ -134,6 +134,15 @@
     return selected;
   }
 
+  function localizedEventText(primary, localizedValue, language) {
+    const selected = language === 'en' ? 'en' : 'zh';
+    const other = selected === 'en' ? 'zh' : 'en';
+    const object = localizedValue && typeof localizedValue === 'object' ? localizedValue : {};
+    const selectedText = String(object[selected] || primary || object[other] || '').trim();
+    const otherText = String(object[other] || primary || selectedText).trim();
+    return { [selected]: selectedText, [other]: otherText };
+  }
+
   function boundedFlags(flags = {}) {
     return Object.fromEntries(Object.entries(flags).slice(0, 40).flatMap(([key, value]) => {
       const safeKey = boundedText(key, 80, 160);
@@ -177,10 +186,10 @@
     return { response, payload: await response.json().catch(() => ({})) };
   }
 
-  function normalizeLiveResult(event, base) {
+  function normalizeLiveResult(event, base, language) {
     return {
       ...base,
-      response: event.dialogue,
+      response: localizedEventText(event.dialogue, event.dialogueLocalized, language),
       memoryRef: event.memory?.save === true || base.memoryRef,
       relationshipDelta: {
         ...(base.relationshipDelta || {}),
@@ -242,7 +251,7 @@
         throw error;
       }
       setRuntime({ source: 'gemini', state: 'ready', errorCode: null, model: payload.meta?.model || null });
-      return { result: normalizeLiveResult(payload.event, base), source: 'gemini', fallback: false, meta: payload.meta || {} };
+      return { result: normalizeLiveResult(payload.event, base, engineState.language), source: 'gemini', fallback: false, meta: payload.meta || {} };
     } catch (error) {
       setRuntime({ source: 'offline', state: 'fallback', errorCode: error?.name === 'AbortError' ? 'provider_timeout' : (error?.code || 'provider_unavailable'), model: null });
       return { result: base, source: 'offline', fallback: true, errorCode: runtime.errorCode };
@@ -255,6 +264,36 @@
     const minimumDelay = Number.isFinite(options.minimumDelay) ? Math.max(0, options.minimumDelay) : 620;
     const [envelope] = await Promise.all([requestReply(method, input, engineState, options), delay(minimumDelay)]);
     return envelope;
+  }
+
+  async function localize(items, targetLanguage, options = {}) {
+    const mode = ['auto', 'live', 'offline'].includes(options.aiMode) ? options.aiMode : 'auto';
+    if (mode === 'offline' || !Array.isArray(items) || !items.length) return { translations: [], skipped: true };
+    const discovery = mode === 'auto' ? await initialize() : null;
+    if (mode === 'auto' && !discovery?.configured) return { translations: [], skipped: true };
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(new URL('api/localize', document.baseURI), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          targetLanguage: targetLanguage === 'zh' ? 'zh' : 'en',
+          items: items.slice(0, 40).map((item) => ({
+            id: boundedText(item?.id, 80, 160),
+            text: boundedText(item?.text, 1200, 3_600)
+          }))
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(payload.translations)) return { translations: [], fallback: true, errorCode: payload?.error?.code || 'provider_unavailable' };
+      return { translations: payload.translations, meta: payload.meta || {}, fallback: false };
+    } catch (error) {
+      return { translations: [], fallback: true, errorCode: error?.name === 'AbortError' ? 'provider_timeout' : 'provider_unavailable' };
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
 
   async function generateSceneBackground(scene, options = {}) {
@@ -288,6 +327,7 @@
   window.EchoApiEngine = {
     initialize,
     reply,
+    localize,
     generateSceneBackground,
     status: () => ({ ...runtime })
   };

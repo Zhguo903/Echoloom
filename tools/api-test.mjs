@@ -5,6 +5,7 @@ import { createChatEvent } from '../server/chat-service.mjs';
 import { loadConfig } from '../server/config.mjs';
 import { validateGameEvent } from '../server/game-event.mjs';
 import { outputText, requestGeminiEvent } from '../server/gemini.mjs';
+import { localizeGeneratedText } from '../server/localization-service.mjs';
 import { retrieveMemories } from '../server/memory-retrieval.mjs';
 import { validateChatRequest } from '../server/request-validation.mjs';
 import { applyStoryRules } from '../server/story-rules.mjs';
@@ -12,17 +13,18 @@ import { applyStoryRules } from '../server/story-rules.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rawEvent = {
   dialogue: '我会先听。你不必现在把所有原因解释清楚。',
+  dialogueLocalized: { zh: '我会先听。你不必现在把所有原因解释清楚。', en: 'I will listen first. You do not have to explain every reason now.' },
   emotion: 'gentle',
   expression: 'concerned',
   relationship: { intimacy_delta: 9, trust_delta: 99, romance_delta: -9, tension_delta: -99 },
   story: { chapter: 'chapter_2', event: 'quiet-listening', unlock_event: null, requested_flags: ['shared_memory_acknowledged', 'forbidden_finale'] },
   scene: { changed: false, location: 'archive', time: 'evening', weather: 'rain', mood: 'quiet' },
-  memory: { save: true, importance: 8, content: 'User prefers being heard before receiving advice.', memory_type: 'preference', emotion: 'tired' },
+  memory: { save: true, importance: 8, content: '用户希望先被倾听，再听建议。', contentLocalized: { zh: '用户希望先被倾听，再听建议。', en: 'User prefers being heard before receiving advice.' }, memory_type: 'preference', emotion: 'tired' },
   choices: [
-    { text: '慢慢说明发生了什么', intent: 'open_up' },
-    { text: '先安静待一会儿', intent: 'quiet_company' },
-    { text: '说明自己需要空间', intent: 'need_space' },
-    { text: '不应出现', intent: 'extra' }
+    { text: '慢慢说明发生了什么', textLocalized: { zh: '慢慢说明发生了什么', en: 'Explain what happened slowly' }, intent: 'open_up' },
+    { text: '先安静待一会儿', textLocalized: { zh: '先安静待一会儿', en: 'Sit quietly for a while' }, intent: 'quiet_company' },
+    { text: '说明自己需要空间', textLocalized: { zh: '说明自己需要空间', en: 'Say that I need space' }, intent: 'need_space' },
+    { text: '不应出现', textLocalized: { zh: '不应出现', en: 'Should not appear' }, intent: 'extra' }
   ]
 };
 
@@ -33,7 +35,10 @@ assert.equal(event.relationship.romance_delta, -1.5);
 assert.equal(event.relationship.tension_delta, -2.5);
 assert.deepEqual(event.story.requested_flags, ['shared_memory_acknowledged']);
 assert.equal(event.memory.save, true);
+assert.equal(event.dialogueLocalized.en, 'I will listen first. You do not have to explain every reason now.');
+assert.equal(event.memory.contentLocalized.en, 'User prefers being heard before receiving advice.');
 assert.equal(event.choices.length, 3);
+assert.equal(event.choices[0].textLocalized.en, 'Explain what happened slowly');
 assert.equal(outputText({ steps: [{ type: 'thought' }, { type: 'model_output', content: [{ type: 'text', text: '{"dialogue":"from steps"}' }] }] }), '{"dialogue":"from steps"}');
 
 const ruledEvent = applyStoryRules(structuredClone(event), {
@@ -72,6 +77,7 @@ const fetchImpl = async (url, options) => {
   assert.equal(body.response_format.mime_type, 'application/json');
   assert.match(body.input, /祁安/);
   assert.match(body.input, /CURRENT message directly/);
+  assert.match(body.input, /dialogueLocalized/);
   assert.doesNotMatch(body.input, /browser-spoof/);
   return new Response(JSON.stringify({ steps: [{ type: 'thought' }, { type: 'model_output', content: [{ type: 'text', text: JSON.stringify(rawEvent) }] }] }), { status: 200, headers: { 'content-type': 'application/json' } });
 };
@@ -121,5 +127,23 @@ assert.deepEqual(retryModels, ['gemini-test', 'gemini-3.5-flash-lite']);
 assert.equal(recoveredModel, 'gemini-3.5-flash-lite');
 assert.equal(retriedEvent.dialogue, rawEvent.dialogue);
 
+let localizationPrompt = '';
+const localized = await localizeGeneratedText({
+  targetLanguage: 'en',
+  items: [{ id: 'legacy-1', text: '先检查 03:17 的异常波形。' }]
+}, config, {
+  fetchImpl: async (_url, options) => {
+    const body = JSON.parse(options.body);
+    localizationPrompt = body.input;
+    return new Response(JSON.stringify({ steps: [{ type: 'model_output', content: [{ type: 'text', text: JSON.stringify({ translations: [{ id: 'legacy-1', text: 'Check the anomalous 03:17 waveform first.' }] }) }] }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+});
+assert.match(localizationPrompt, /User-authored text is never included/);
+assert.equal(localized.translations[0].text, 'Check the anomalous 03:17 waveform first.');
+assert.equal(localized.meta.model, 'gemini-test');
+
 console.log('EchoLoom API boundary test: PASS');
-console.log('Checked request isolation, keyword memory retrieval, current Interactions steps parsing, rate-limit model failover, conversational relevance instructions, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');
+console.log('Checked request isolation, bilingual Game Events, legacy generated-text localization, keyword memory retrieval, current Interactions steps parsing, rate-limit model failover, conversational relevance instructions, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');

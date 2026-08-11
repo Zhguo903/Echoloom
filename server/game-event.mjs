@@ -2,6 +2,11 @@ const MEMORY_TYPES = new Set(['profile', 'preference', 'relationship', 'emotiona
 const EXPRESSIONS = new Set(['neutral', 'gentle', 'concerned', 'distant', 'thoughtful', 'guarded', 'surprised', 'relieved']);
 const EMOTIONS = new Set(['neutral', 'gentle', 'warm', 'concerned', 'curious', 'guarded', 'sad', 'tense', 'relieved', 'playful']);
 const ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+const localizedTextSchema = {
+  type: 'object', additionalProperties: false,
+  properties: { zh: { type: 'string' }, en: { type: 'string' } },
+  required: ['zh', 'en']
+};
 
 const relationshipProperties = {
   intimacy_delta: { type: 'number', minimum: -2.5, maximum: 2.5 },
@@ -14,7 +19,8 @@ export const GAME_EVENT_SCHEMA = Object.freeze({
   type: 'object',
   additionalProperties: false,
   properties: {
-    dialogue: { type: 'string', description: 'Concise in-character dialogue, normally one to three short paragraphs.' },
+    dialogue: { type: 'string', description: 'Concise in-character dialogue in the selected interface language.' },
+    dialogueLocalized: localizedTextSchema,
     emotion: { type: 'string', enum: [...EMOTIONS] },
     expression: { type: 'string', enum: [...EXPRESSIONS] },
     relationship: {
@@ -41,20 +47,21 @@ export const GAME_EVENT_SCHEMA = Object.freeze({
       type: 'object', additionalProperties: false,
       properties: {
         save: { type: 'boolean' }, importance: { type: 'integer', minimum: 0, maximum: 10 },
-        content: { type: 'string' }, memory_type: { type: 'string', enum: [...MEMORY_TYPES] }, emotion: { type: 'string' }
+        content: { type: 'string' }, contentLocalized: localizedTextSchema,
+        memory_type: { type: 'string', enum: [...MEMORY_TYPES] }, emotion: { type: 'string' }
       },
-      required: ['save', 'importance', 'content', 'memory_type', 'emotion']
+      required: ['save', 'importance', 'content', 'contentLocalized', 'memory_type', 'emotion']
     },
     choices: {
       type: 'array', maxItems: 3,
       items: {
         type: 'object', additionalProperties: false,
-        properties: { text: { type: 'string' }, intent: { type: 'string' } },
-        required: ['text', 'intent']
+        properties: { text: { type: 'string' }, textLocalized: localizedTextSchema, intent: { type: 'string' } },
+        required: ['text', 'textLocalized', 'intent']
       }
     }
   },
-  required: ['dialogue', 'emotion', 'expression', 'relationship', 'story', 'scene', 'memory', 'choices']
+  required: ['dialogue', 'dialogueLocalized', 'emotion', 'expression', 'relationship', 'story', 'scene', 'memory', 'choices']
 });
 
 function text(value, maximum, fallback = '') {
@@ -66,6 +73,13 @@ function delta(value, minimum, maximum) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
   return Math.round(Math.max(minimum, Math.min(maximum, number)) * 4) / 4;
+}
+
+function localizedText(value, fallback = '', maximum = 1200) {
+  const object = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const zh = text(object.zh, maximum, fallback) || fallback;
+  const en = text(object.en, maximum, fallback) || fallback;
+  return { zh, en };
 }
 
 function eventId(value, fallback = '') {
@@ -85,6 +99,7 @@ export function validateGameEvent(value, { allowedFlags = [] } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new GameEventError('Model output is not a JSON object.');
   const dialogue = text(value.dialogue, 1200);
   if (!dialogue) throw new GameEventError('Model output has no dialogue.');
+  const dialogueLocalized = localizedText(value.dialogueLocalized, dialogue, 1200);
   const allowedFlagSet = new Set(allowedFlags);
   const relationship = value.relationship && typeof value.relationship === 'object' ? value.relationship : {};
   const story = value.story && typeof value.story === 'object' ? value.story : {};
@@ -93,10 +108,12 @@ export function validateGameEvent(value, { allowedFlags = [] } = {}) {
   const importance = Math.round(Math.max(0, Math.min(10, Number(sourceMemory.importance) || 0)));
   const memoryType = MEMORY_TYPES.has(sourceMemory.memory_type) ? sourceMemory.memory_type : 'relationship';
   const memoryContent = text(sourceMemory.content, 1000);
+  const memoryContentLocalized = localizedText(sourceMemory.contentLocalized, memoryContent, 1000);
   const shouldSaveMemory = sourceMemory.save === true && importance >= 6 && memoryContent.length >= 8;
 
   return {
     dialogue,
+    dialogueLocalized,
     emotion: EMOTIONS.has(value.emotion) ? value.emotion : 'neutral',
     expression: EXPRESSIONS.has(value.expression) ? value.expression : 'neutral',
     relationship: {
@@ -122,11 +139,13 @@ export function validateGameEvent(value, { allowedFlags = [] } = {}) {
       save: shouldSaveMemory,
       importance,
       content: shouldSaveMemory ? memoryContent : '',
+      contentLocalized: shouldSaveMemory ? memoryContentLocalized : { zh: '', en: '' },
       memory_type: memoryType,
       emotion: text(sourceMemory.emotion, 40, 'neutral') || 'neutral'
     },
     choices: Array.isArray(value.choices) ? value.choices.slice(0, 3).map((choice) => ({
-      text: text(choice?.text, 40),
+      text: text(choice?.text, 80),
+      textLocalized: localizedText(choice?.textLocalized, text(choice?.text, 80), 80),
       intent: eventId(choice?.intent, 'respond')
     })).filter((choice) => choice.text) : []
   };
@@ -144,4 +163,3 @@ export function parseModelJson(value) {
     try { return JSON.parse(fenced); } catch { throw new GameEventError('Model response was not valid JSON.'); }
   }
 }
-

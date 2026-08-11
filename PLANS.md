@@ -1,5 +1,16 @@
 # EchoLink MVP Plan
 
+## Complete bilingual runtime content — 2026-08-11
+
+- Require every live Game Event to include Chinese and English versions of dialogue, intent suggestions, and saved-memory content; keep the selected interface language as the conversational primary language.
+- Persist application-generated messages, relationship explanations, knowledge sources, promises, and system records as bilingual values so changing the interface language rerenders them instead of freezing the language used when the event occurred.
+- Preserve user-authored text exactly as entered. Preserve schema-v10 imports; normalize old single-language live choices without deleting them, and replace stale choices with localized defaults immediately after a language change.
+- Keep character separation, free text, offline operation, source-linked memories, and validated structured events unchanged.
+
+Success criteria: the Shen Yao EchoLink screen shows English live suggestions after switching to English; new Gemini replies and memories can switch both ways without another API call; deterministic runtime records also switch; schema migration/export/import tests pass; and mobile/desktop layouts remain usable.
+
+Status: Complete — `npm test` passes; a real Gemini Shen Yao request returns English primary dialogue and choices plus Chinese/English localized fields; legacy NPC/system text localizes without changing player-authored messages; English Shen Yao and Qi An EchoLink screens show English intent suggestions; desktop navigation titles are translated; and 393 × 852 plus 1440 × 1000 responsive checks have no horizontal overflow.
+
 ## Long-conversation resilience — 2026-08-10
 
 - Keep each live request within a fixed rolling-context budget: the latest conversation turns plus a compact, relevant memory snapshot, while leaving the complete local transcript and user-controlled memory archive intact.

@@ -1,11 +1,25 @@
 (() => {
   const KEY = 'echoloom.demo.v2';
   const LEGACY_KEY = 'echoloom-demo-state-v1';
-  const SCHEMA_VERSION = 10;
+  const SCHEMA_VERSION = 11;
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const data = () => window.ECHOLOOM_DATA;
   const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+  function localizedValue(value, maximum = 1200) {
+    if (typeof value === 'string') return value.slice(0, maximum);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+    const zh = typeof value.zh === 'string' ? value.zh.slice(0, maximum) : '';
+    const en = typeof value.en === 'string' ? value.en.slice(0, maximum) : '';
+    if (!zh && !en) return '';
+    return { zh: zh || en, en: en || zh };
+  }
+
+  function inferredLanguage(value) {
+    if (typeof value !== 'string') return null;
+    return /[\u3400-\u9fff]/.test(value) ? 'zh' : 'en';
+  }
 
   function mergeSettings(saved = {}, sourceVersion = SCHEMA_VERSION) {
     const base = data().defaultState.settings;
@@ -134,9 +148,10 @@
       },
       liveStory: mergeLiveStory(saved.liveStory || {}, base.liveStory),
       liveChoices: Array.isArray(saved.liveChoices) ? saved.liveChoices.slice(0, 3).map((choice) => ({
-        text: typeof choice?.text === 'string' ? choice.text.slice(0, 40) : '',
+        text: localizedValue(choice?.text, 80),
+        language: choice?.language === 'zh' || choice?.language === 'en' ? choice.language : inferredLanguage(choice?.text),
         intent: typeof choice?.intent === 'string' ? choice.intent.slice(0, 64) : 'respond'
-      })).filter((choice) => choice.text) : [],
+      })).filter((choice) => typeof choice.text === 'string' ? choice.text : choice.text?.zh || choice.text?.en) : [],
       liveExpression: ['neutral', 'gentle', 'concerned', 'distant', 'thoughtful', 'guarded', 'surprised', 'relieved'].includes(saved.liveExpression) ? saved.liveExpression : 'neutral',
       liveEmotion: typeof saved.liveEmotion === 'string' ? saved.liveEmotion.slice(0, 40) : 'neutral',
       liveScene: mergeLiveScene(saved.liveScene || {}, base.liveScene),

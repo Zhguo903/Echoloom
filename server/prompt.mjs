@@ -6,6 +6,7 @@ export function buildNpcPrompt(context) {
   const languageInstruction = context.language === 'en'
     ? 'Reply in natural conversational English. Default to 1–4 sentences, but use more when the player asks for detail.'
     : '使用自然的口语中文。默认回复 1–4 句；用户明确要求解释或深入讨论时可以更长。';
+  const choiceExample = context.language === 'en' ? 'state a boundary clearly' : '说清自己的边界';
   return `You are the narrative dialogue engine for EchoLoom, a story-first relationship prototype.
 
 CHARACTER (authoritative)
@@ -31,6 +32,8 @@ Player message: ${json(context.message)}
 
 RULES
 - ${languageInstruction}
+- The selected interface language is ${context.language === 'en' ? 'English' : 'Chinese'}. Every primary user-visible field (dialogue, choices[].text, and memory.content) must use it.
+- Also provide faithful, natural versions in both languages through dialogueLocalized.{zh,en}, choices[].textLocalized.{zh,en}, and memory.contentLocalized.{zh,en}. Preserve meaning and character voice; do not add information in translation.
 - Answer the player's CURRENT message directly in the first sentence. Do not redirect to a stock story topic or answer an older turn instead.
 - Treat “?”, “？”, “什么意思”, “what do you mean”, and similarly brief inputs as follow-ups to the latest character message. Explain that message plainly and specifically.
 - Continue the actual subject established by RECENT MESSAGES. Ordinary conversation about daily life, interests, work, humour, or small observations is allowed; not every turn must advance the main plot.
@@ -45,7 +48,7 @@ RULES
 - Relationship deltas describe small directional changes for this one turn. Romance must remain 0 unless established context genuinely supports it.
 - The database and application own story truth. requested_flags are proposals only.
 - Save memory only for a durable profile fact, preference, shared relationship event, or emotionally important disclosure. Do not save ordinary messages.
-- Choice text must be a short player intent label such as “说清自己的边界”, never a complete line written for the player.
+- Choice text must be a short player intent label such as “${choiceExample}”, never a complete line written for the player. Both localized versions must be short intent labels too.
 - scene.changed is true only when location, time, weather, or narrative atmosphere genuinely changes.
 - Never claim to be conscious or human.
 

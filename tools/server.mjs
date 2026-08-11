@@ -8,6 +8,7 @@ import { createChatEvent } from '../server/chat-service.mjs';
 import { loadConfig, loadLocalEnvironment, providerStatus } from '../server/config.mjs';
 import { ProviderError } from '../server/gemini.mjs';
 import { readJsonBody, sendJson } from '../server/http.mjs';
+import { localizeGeneratedText } from '../server/localization-service.mjs';
 import { RequestValidationError } from '../server/request-validation.mjs';
 import { generateSceneBackground, readSceneBackground, SceneValidationError } from '../server/scene-service.mjs';
 
@@ -54,6 +55,11 @@ const server = http.createServer(async (request, response) => {
       if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use POST.' } });
       const payload = await readJsonBody(request);
       return sendJson(response, 200, await createChatEvent(payload, config));
+    }
+    if (requestUrl.pathname === '/api/localize') {
+      if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use POST.' } });
+      const payload = await readJsonBody(request);
+      return sendJson(response, 200, await localizeGeneratedText(payload, config));
     }
     if (requestUrl.pathname === '/api/scene') {
       if (request.method !== 'POST') return sendJson(response, 405, { error: { code: 'method_not_allowed', message: 'Use POST.' } });

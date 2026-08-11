@@ -8,14 +8,14 @@ The project uses plain HTML, CSS, browser JavaScript, editable SVG assets, and a
 
 1. `index.html` creates the desktop presentation shell and mobile viewport.
 2. `app/data.js` loads bilingual copy, five character profiles, five data-driven rescue routes, the five ordered investigation chapters, the five-thread Weaver arc, first-contact copy, journey factories, creation-capacity helpers, and scene metadata.
-3. `app/storage.js` loads schema version 10 from `echoloom.demo.v2`, migrates schema-version-9's default offline setting to automatic provider discovery, adds safe live-event/story/scene defaults to version 8, and conservatively migrates all older archives.
+3. `app/storage.js` loads schema version 11 from `echoloom.demo.v2`, preserves bilingual generated values, tags schema-version-10 single-language live choices for safe localization, migrates schema-version-9's default offline setting to automatic provider discovery, and conservatively migrates all older archives.
 4. `app/story-engine.js` provides character-specific deterministic offline simulation and emits behaviour tags, directional relationship deltas, and player-expression signals.
 5. `app/api-engine.js` optionally calls the local server for a structured live reply and scene background. It maps validated events into the existing UI result shape and falls back to `EchoEngine` on every provider failure.
 6. `server/` keeps provider credentials, selected-character retrieval, prompt assembly, semantic validation, story rules, optional Supabase persistence, and Cloudflare image caching outside the browser.
 7. `app/app.js` renders the onboarding state machine, dynamic Observatory task, sequential investigation, *The First Free Thread*, free tutorial creation, the quota-aware Weaver Workshop, Story/World hubs, EchoLink terminal, selected character journey, relationship/knowledge dossier, and archive tree.
 8. `localStorage` persists every character journey, campaign state, live-event metadata, and up to six non-recursive archive snapshots together. Export/import serializes the full local state as one relationship archive.
 
-## State schema version 10
+## State schema version 11
 
 Important top-level fields:
 
@@ -64,9 +64,11 @@ The onboarding sequence ends at `observatory-home`. The investigation repeats `o
 
 Memories use five UI types (`fact`, `event`, `promiseBoundary`, `relationshipJudgement`, and `reflection`) plus world, branch, source, confidence, and provenance metadata. Validated live memories additionally preserve one of `profile`, `preference`, `relationship`, or `emotional`, importance, emotion, and the triggering message ID. Player-correctable facts, events, and promises/boundaries can be edited; character judgements and reflections cannot be directly rewritten.
 
+Generated dialogue, live intent choices, memory content/sources, relationship explanations, and deterministic system records may use `{ zh, en }` values. Rendering always selects the current interface language. Player-authored messages and manually edited memory text remain plain strings and are never translated automatically. After importing a schema-version-10 archive, a server-only `POST /api/localize` request can translate legacy NPC/system-generated strings once; the bilingual result is then cached in local state. With no Gemini key, the original generated string remains intact and stale-language live choices are replaced visually by the built-in localized suggestions.
+
 ## Optional live-provider flow
 
-`POST /api/chat` validates a bounded request and sends only the selected character's current relationship, story state, recent messages, and relevant memories. The browser keeps the complete local transcript but builds each request from a byte-bounded rolling window: up to 20 newest turns and 16 ranked non-obsolete memories, with pinned and current-topic memories preferred. Normal requests stay below 28 KB; the server accepts at most 96 KiB and still applies field-level validation. Gemini returns structured JSON rather than dialogue alone. `server/game-event.mjs` validates enums and lengths and clamps relationship deltas. `server/story-rules.mjs` preserves the canonical chapter and confirms only known flags whose application prerequisites are true. If configured, a security-definer Supabase RPC stores the event atomically using a server-owned demo-user UUID.
+`POST /api/chat` validates a bounded request and sends only the selected character's current relationship, story state, recent messages, and relevant memories. The browser keeps the complete local transcript but builds each request from a byte-bounded rolling window: up to 20 newest turns and 16 ranked non-obsolete memories, with pinned and current-topic memories preferred. Normal requests stay below 28 KB; the server accepts at most 96 KiB and still applies field-level validation. Gemini returns structured JSON with the selected-language primary fields plus Chinese and English versions of dialogue, intent choices, and memory content. `server/game-event.mjs` validates enums, bilingual fields, and lengths and clamps relationship deltas. `server/story-rules.mjs` preserves the canonical chapter and confirms only known flags whose application prerequisites are true. If configured, a security-definer Supabase RPC stores the event atomically using a server-owned demo-user UUID.
 
 When the validated event contains `scene.changed: true`, the browser separately calls `POST /api/scene`. `server/scene-service.mjs` builds a deterministic visual prompt, fingerprints it with SHA-256, reuses `.cache/echoloom-scenes`, or calls Cloudflare Workers AI. Dynamic image URLs are restricted to `/api/scenes/<64 hex>.jpg`; imported archives cannot inject an arbitrary image URL. A scene error never changes or blocks the dialogue result.
 
@@ -76,7 +78,7 @@ Gemini Interactions responses are read from the current `steps[] → model_outpu
 
 ## Compatibility
 
-Schema-version-10 exports restore onboarding, all five journeys, investigation progress, Weaver progress, live events/memories/cached-scene metadata, provider preference, quota use, tutorial and formal creations, EchoLink, campaign, and branches. Schema-version-9 archives that still contain the old default `offline` value migrate to `auto`; schema-version-8 files keep an explicit `live` choice and receive safe live defaults. Older relationship, story, and archive migrations remain conservative.
+Schema-version-11 exports restore onboarding, all five journeys, bilingual live content, investigation progress, Weaver progress, live events/memories/cached-scene metadata, provider preference, quota use, tutorial and formal creations, EchoLink, campaign, and branches. Schema-version-10 archives preserve existing strings and tag their language; schema-version-9 archives that still contain the old default `offline` value migrate to `auto`; schema-version-8 files keep an explicit `live` choice and receive safe live defaults. Older relationship, story, and archive migrations remain conservative.
 
 EchoLink uses the existing `chatReply` engine for core-character private messages. Group, side-NPC, delayed delivery, contact permission, promises, and high-risk relationship transitions remain rules-controlled. Private player-intent metadata is stored on the player message but is not inserted into NPC-visible text.
 

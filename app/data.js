@@ -1396,7 +1396,7 @@
   };
 
   const defaultState = {
-    version: 10,
+    version: 11,
     language: 'zh',
     screen: 'splash',
     onboardingStarted: false,

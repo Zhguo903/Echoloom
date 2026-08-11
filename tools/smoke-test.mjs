@@ -19,6 +19,7 @@ const required = [
   'server/config.mjs',
   'server/game-event.mjs',
   'server/gemini.mjs',
+  'server/localization-service.mjs',
   'server/scene-service.mjs',
   'server/supabase.mjs',
   'supabase/migrations/202608100001_api_foundation.sql',
@@ -89,6 +90,12 @@ try {
   });
   const chatPayload = await chatResponse.json();
   if (chatResponse.status !== 503 || chatPayload.fallback !== 'offline') throw new Error('Unconfigured chat API did not return a typed offline fallback.');
+  const localizationResponse = await fetch(`http://127.0.0.1:${port}/api/localize`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ targetLanguage: 'en', items: [{ id: 'legacy-1', text: '你好。' }] })
+  });
+  const localizationPayload = await localizationResponse.json();
+  if (localizationResponse.status !== 503 || localizationPayload.fallback !== 'offline') throw new Error('Unconfigured localization API did not return a typed offline fallback.');
   const boundedLongBody = JSON.stringify({
     characterId: 'qian',
     message: 'Long context parse test.',
@@ -149,7 +156,7 @@ try {
     if ((await response.arrayBuffer()).byteLength < minimumBytes) throw new Error(`${url} is unexpectedly small`);
   }
   console.log('EchoLoom smoke test: PASS');
-  console.log(`Checked ${required.length} required files and ${checks.length + pngChecks.length + 2} served resources.`);
+  console.log(`Checked ${required.length} required files and ${checks.length + pngChecks.length + 3} served resources.`);
 } finally {
   child.kill('SIGTERM');
 }

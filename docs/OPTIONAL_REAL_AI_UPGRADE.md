@@ -26,7 +26,7 @@ free-text input
 1. Copy `.env.example` to `.env`. The zero-dependency server reads `.env` automatically; process environment variables take precedence.
 2. Add `GEMINI_API_KEY` to enable live dialogue. `GEMINI_MODEL` defaults to `gemini-3.6-flash`; `GEMINI_FALLBACK_MODEL` defaults to the stable, higher-throughput `gemini-3.5-flash-lite` and is tried when the primary model returns 429.
 3. Optionally add Supabase and/or Cloudflare values described below.
-4. Run `npm start`. Schema v10's default **Automatic** mode detects the server key and enables Gemini; Settings also offers **Always try Gemini** and **Force offline simulation**. Never open a live test by serving the browser files from a different server.
+4. Run `npm start`. Schema v11's default **Automatic** mode detects the server key and enables Gemini; Settings also offers **Always try Gemini** and **Force offline simulation**. Never open a live test by serving the browser files from a different server.
 
 Do not commit `.env`. The provider-status endpoint reports only whether a provider is configured and which public model name is selected; it never returns a credential.
 
@@ -60,6 +60,10 @@ The normalized event contains:
 ```json
 {
   "dialogue": "Concise in-character reply",
+  "dialogueLocalized": {
+    "zh": "简短、符合角色性格的回复",
+    "en": "Concise in-character reply"
+  },
   "emotion": "gentle",
   "expression": "concerned",
   "relationship": {
@@ -86,14 +90,22 @@ The normalized event contains:
     "save": true,
     "importance": 8,
     "content": "User prefers quiet company before advice.",
+    "contentLocalized": {
+      "zh": "玩家在得到建议前更喜欢安静的陪伴。",
+      "en": "User prefers quiet company before advice."
+    },
     "memory_type": "preference",
     "emotion": "tired"
   },
-  "choices": [{ "text": "先安静陪伴", "intent": "quiet_company" }]
+  "choices": [{
+    "text": "Offer quiet company",
+    "textLocalized": { "zh": "先安静陪伴", "en": "Offer quiet company" },
+    "intent": "quiet_company"
+  }]
 }
 ```
 
-Relationship deltas are clamped server-side. Model choices are at most three short intent labels; free text remains available. The model can propose only four known story flags. The application confirms them from observable prerequisites, preserves the canonical chapter, and never lets the model unlock an arbitrary finale.
+The primary `dialogue`, `memory.content`, and `choices[].text` fields use the selected interface language, while their `*Localized` fields always carry both Chinese and English. Relationship deltas are clamped server-side. Model choices are at most three short intent labels; free text remains available. The model can propose only four known story flags. The application confirms them from observable prerequisites, preserves the canonical chapter, and never lets the model unlock an arbitrary finale.
 
 ## Memory rules
 
@@ -112,6 +124,7 @@ The response URL is `GET /api/scenes/<sha256>.jpg`. The fingerprint makes identi
 - `GET /api/health` — local server health.
 - `GET /api/provider-status` — secret-free configuration status.
 - `POST /api/chat` — validated Gemini Game Event; returns typed `provider_*` errors with `fallback: "offline"`.
+- `POST /api/localize` — translates only legacy NPC/system-generated strings into `zh` or `en`; it never receives player-authored text.
 - `POST /api/scene` — scene-change-gated Cloudflare generation/cache lookup.
 - `GET /api/scenes/<fingerprint>.jpg` — immutable cached scene image.
 
