@@ -53,7 +53,7 @@ const required = [
 for (const relative of required) await access(path.join(root, relative));
 
 const appSource = await readFile(path.join(root, 'app/app.js'), 'utf8');
-for (const expected of ['renderBrandSplash', 'renderTitle', 'renderPrologue', 'renderPlayerName', 'renderSignalScan', 'renderSignalDetail', 'renderSignalConfirm', 'renderFirstRescue', 'renderEventResult', 'renderEchoActivation', 'renderFirstContact', 'renderObservatoryHome', 'renderStoryHub', 'renderWorldHub', 'renderArchiveBranches', 'completeFirstRescue', 'sendFirstContact', 'chronologicalStoryView', 'characterAvatar', 'renderTogether', 'renderEchoes', 'renderStation', 'renderEchoLink', 'renderEchoTyping', 'scheduleEchoReply', 'echoPendingReplies', 'sendEchoMessage', 'renderRelationship', 'renderSharedEvent', 'createArchive', 'activeJourney', 'EchoStorage', 'EchoEngine', 'EchoApiEngine']) {
+for (const expected of ['renderBrandSplash', 'renderTitle', 'renderPrologue', 'renderPlayerName', 'renderSignalScan', 'renderSignalDetail', 'renderSignalConfirm', 'renderFirstRescue', 'renderEventResult', 'renderEchoActivation', 'renderFirstContact', 'renderObservatoryHome', 'renderStoryHub', 'renderWorldHub', 'renderArchiveBranches', 'completeFirstRescue', 'sendFirstContact', 'chronologicalStoryView', 'characterAvatar', 'renderTogether', 'renderEchoes', 'renderStation', 'renderEchoLink', 'renderEchoTyping', 'scheduleEchoReply', 'echoPendingReplies', 'sendEchoMessage', 'selectEchoIntent', 'aria-pressed', 'renderRelationship', 'renderSharedEvent', 'createArchive', 'activeJourney', 'EchoStorage', 'EchoEngine', 'EchoApiEngine']) {
   if (!appSource.includes(expected)) throw new Error(`app.js is missing ${expected}`);
 }
 

@@ -1,5 +1,15 @@
 # EchoLink MVP Plan
 
+## EchoLink intent-button feedback — 2026-08-11
+
+- Make the three fallback intent suggestions visibly selectable instead of silently changing hidden metadata.
+- When the composer is empty, copy the short intent label into the free-text field as an editable draft; never auto-send or overwrite text the player already wrote.
+- Keep the private-intent dropdown synchronized and preserve live Gemini suggestion behaviour, keyboard access, offline operation, and the intent-only wording rule.
+
+Success criteria: each fallback button gains a visible selected state, updates the dropdown, focuses the composer, fills an empty composer, preserves an existing draft, and works at 393 × 852 and desktop size.
+
+Status: Complete — `npm test` passes; real browser clicks update `aria-pressed`, the visible highlight, private-intent dropdown, focus, and empty draft; an existing draft remains unchanged; and 393 × 852 plus 1440 × 1000 checks have no horizontal overflow.
+
 ## Complete bilingual runtime content — 2026-08-11
 
 - Require every live Game Event to include Chinese and English versions of dialogue, intent suggestions, and saved-memory content; keep the selected interface language as the conversational primary language.

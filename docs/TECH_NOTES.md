@@ -19,6 +19,7 @@
 - EchoLink contact access is derived from the current story state; seeing an NPC does not grant every private channel.
 - Core private messages reuse `EchoEngine.chatReply`; group attribution, delayed delivery, side-NPC replies, promises, and call availability are deterministic offline rules.
 - EchoLink replies use one thread-scoped scheduler: the player message renders immediately, an avatar-based three-dot status appears, and a token-checked callback inserts exactly one reply. Pending timers are runtime-only and are cancelled by reset, import, or rewind.
+- EchoLink fallback intent suggestions expose their selected state through highlight and `aria-pressed`, synchronize the private-intent selector, and copy only a short editable intent label into an empty composer. They never auto-send or replace a draft the player already wrote.
 - `app/reply-timing.js` bounds simulated waits to 650–2600 ms. Character habit and channel remain primary context; relationship continuity and recent communication rhythm adjust the wait without creating a single affection score.
 - Simulated voice/photo messages are typed narrative records. The prototype does not capture media or claim a real call occurred.
 - Each journey stores a recent communication pulse separately from its long-term relationship dimensions.

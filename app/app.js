@@ -720,10 +720,34 @@
     const pending = echoPendingReplies.has(thread.id);
     const journey = state.journeys?.[contactId];
     const liveChoices = thread.type === 'private' ? (journey?.liveChoices || []).map(liveChoiceText).filter(Boolean) : [];
+    const fallbackIntents = [
+      { id: 'friendship', label: langText('朋友式关心', 'Friendly care') },
+      { id: 'task', label: langText('询问事实与风险', 'Ask facts and risk') },
+      { id: 'uncertain', label: langText('暂时不确定', 'Still uncertain') }
+    ];
     const intentSuggestions = liveChoices.length
       ? liveChoices.map((choice) => `<button type="button" data-action="echolink-live-choice" data-text="${esc(choice)}">${esc(choice)}</button>`).join('')
-      : `<button type="button" data-action="echolink-suggest" data-intent="friendship">${esc(langText('朋友式关心', 'Friendly care'))}</button><button type="button" data-action="echolink-suggest" data-intent="task">${esc(langText('询问事实与风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-suggest" data-intent="uncertain">${esc(langText('暂时不确定', 'Still uncertain'))}</button>`;
+      : fallbackIntents.map(({ id, label }) => `<button type="button" class="${terminal.privateIntent === id ? 'active' : ''}" data-action="echolink-suggest" data-intent="${id}" data-text="${esc(label)}" aria-pressed="${terminal.privateIntent === id}">${esc(label)}</button>`).join('');
     return `<section class="app-screen echolink-screen echo-thread-screen" data-expression="${esc(journey?.liveExpression || 'neutral')}">${statusBar()}<div class="echolink-header thread"><button class="round-icon-button" type="button" data-action="echolink-close-thread" aria-label="Back">${icon('back',18)}</button><div><strong>${esc(echoThreadTitle(thread))}</strong><span>${esc(subtitle)}</span></div>${thread.id === 'shenyao' ? `<button class="round-icon-button" type="button" data-action="echolink-call">${icon('call',16)}</button>` : '<span></span>'}</div>${thread.type === 'private' ? providerStatusMarkup() : ''}<div class="echo-thread-body" id="echo-thread-body">${thread.messages.map((message)=>renderEchoMessage(message,thread)).join('')}${renderEchoTyping(thread)}${nightTrain && !pending ? `<section class="message-event-card"><span>${esc(langText('异步剧情 · 夜间列车', 'Async story · Night Train'))}</span><p>${esc(langText('黎川会根据你的行动继续自己的路线；不回复本身不会降低关系。', 'Li Chuan will continue his route based on your action; silence alone does not lower the bond.'))}</p><div><button type="button" data-action="echolink-invite" data-choice="join">${esc(langText('愿意同行', 'Go together'))}</button><button type="button" data-action="echolink-invite" data-choice="ask">${esc(langText('先问风险', 'Ask facts and risk'))}</button><button type="button" data-action="echolink-invite" data-choice="alternative">${esc(langText('拒绝并提替代', 'Decline, offer alternative'))}</button></div></section>` : ''}</div><div class="echo-composer"><div class="intent-suggestions">${intentSuggestions}</div><label class="private-intent"><span>${esc(langText('主控真实意图 · NPC 不直接看到', 'Player intent · not directly shown to NPC'))}</span><select id="echo-private-intent"><option value="friendship" ${terminal.privateIntent === 'friendship' ? 'selected' : ''}>${esc(langText('朋友式关心', 'Friendship'))}</option><option value="hidden-romance" ${terminal.privateIntent === 'hidden-romance' ? 'selected' : ''}>${esc(langText('隐藏好感', 'Hidden romantic interest'))}</option><option value="uncertain" ${terminal.privateIntent === 'uncertain' ? 'selected' : ''}>${esc(langText('自己也不确定', 'Uncertain'))}</option><option value="task" ${terminal.privateIntent === 'task' ? 'selected' : ''}>${esc(langText('任务合作', 'Task cooperation'))}</option></select></label><div class="channel-switch">${availableChannels.map((channel)=>`<button type="button" class="${terminal.composerChannel === channel ? 'active' : ''}" data-action="echolink-channel" data-channel="${channel}">${channel === 'voice' ? icon('mic',14) : channel === 'photo' ? icon('image',14) : icon('message',14)}${esc(echoChannelLabel(channel))}</button>`).join('')}</div><div class="echo-input-row"><input id="echo-message-input" maxlength="300" ${pending ? 'disabled' : ''} placeholder="${esc(pending ? langText('对方正在输入…', 'Waiting for reply…') : langText('自由输入；建议只表达意图', 'Write freely; suggestions express intent only'))}"><button type="button" data-action="echolink-send" aria-label="${esc(t('send'))}" ${pending ? 'disabled' : ''}>${icon('send',17)}</button></div><button class="silence-button" type="button" data-action="echolink-silence" ${pending ? 'disabled' : ''}>${esc(langText('保持沉默／稍后回复', 'Stay silent / reply later'))}</button></div></section>`;
+  }
+
+  function selectEchoIntent(intent, suggestedText = '') {
+    const allowed = new Set(['friendship', 'hidden-romance', 'uncertain', 'task']);
+    if (!allowed.has(intent)) return;
+    state.campaign.echoLink.privateIntent = intent;
+    const select = document.getElementById('echo-private-intent');
+    if (select) select.value = intent;
+    document.querySelectorAll('[data-action="echolink-suggest"]').forEach((button) => {
+      const selected = button.dataset.intent === intent;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    const input = document.getElementById('echo-message-input');
+    if (input && !input.disabled) {
+      if (!input.value.trim() && suggestedText) input.value = String(suggestedText).slice(0, 80);
+      input.focus();
+    }
+    window.EchoStorage.save(state);
   }
 
   function renderRelationship() {
@@ -2823,7 +2847,7 @@
       }
       case 'echolink-close-thread': state.campaign.echoLink.activeThreadId = null; render(); break;
       case 'echolink-channel': state.campaign.echoLink.composerChannel = element.dataset.channel; render(); requestAnimationFrame(() => document.getElementById('echo-message-input')?.focus()); break;
-      case 'echolink-suggest': state.campaign.echoLink.privateIntent = element.dataset.intent; render(); requestAnimationFrame(() => document.getElementById('echo-message-input')?.focus()); break;
+      case 'echolink-suggest': selectEchoIntent(element.dataset.intent, element.dataset.text); break;
       case 'echolink-live-choice': {
         const choice = String(element.dataset.text || '').slice(0, 80);
         const input = document.getElementById('echo-message-input');
@@ -2887,7 +2911,7 @@
     if (event.target.id === 'language-select') setInterfaceLanguage(event.target.value);
     if (event.target.id === 'frequency-select') { state.settings.frequency = event.target.value; render(); }
     if (event.target.id === 'ai-mode-select') { state.settings.aiMode = ['auto', 'live', 'offline'].includes(event.target.value) ? event.target.value : 'auto'; render(); }
-    if (event.target.id === 'echo-private-intent') { state.campaign.echoLink.privateIntent = event.target.value; }
+    if (event.target.id === 'echo-private-intent') selectEchoIntent(event.target.value);
   });
   document.addEventListener('click', (event) => {
     const navButton = event.target.closest('[data-desktop-route]');
