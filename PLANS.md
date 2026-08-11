@@ -1,5 +1,16 @@
 # EchoLink MVP Plan
 
+## Long-conversation resilience — 2026-08-10
+
+- Keep each live request within a fixed rolling-context budget: the latest conversation turns plus a compact, relevant memory snapshot, while leaving the complete local transcript and user-controlled memory archive intact.
+- If an older or imported archive still creates an oversized request, retry once with an emergency compact context instead of immediately dropping to a fixed offline line.
+- Retry short-lived Gemini rate-limit and provider failures within one bounded request; switch a primary-model 429 to the configured stable Flash-Lite fallback, then keep the existing offline fallback available without disabling later live attempts.
+- Preserve character separation, free text, the four-method `EchoEngine` interface, schema-v10 exports, and fully offline operation.
+
+Success criteria: a synthetic conversation far beyond the visible demo length remains under the request budget; 413 and first-attempt 429 failures recover automatically; normal live replies remain contextual; automated tests pass; and the EchoLink screen remains usable at 393 × 852 and desktop size.
+
+Status: Complete — a 180-turn/100-memory fixture stays within the 28 KB client budget and preserves topic-relevant memory; 413 compact retry and primary-model 429 failover pass automated coverage; `npm test` passes; real Gemini failover returns through `gemini-3.5-flash-lite`; and the existing long EchoLink thread continues with a contextual live reply at 393 × 852 and 1440 × 1000 with no console errors.
+
 ## Open multi-turn conversation correction — 2026-08-10
 
 - Parse current Gemini Interactions responses from `steps[].content[]` instead of incorrectly treating successful responses as provider failures.

@@ -89,6 +89,18 @@ try {
   });
   const chatPayload = await chatResponse.json();
   if (chatResponse.status !== 503 || chatPayload.fallback !== 'offline') throw new Error('Unconfigured chat API did not return a typed offline fallback.');
+  const boundedLongBody = JSON.stringify({
+    characterId: 'qian',
+    message: 'Long context parse test.',
+    memories: Array.from({ length: 20 }, (_, index) => ({ id: `m-${index}`, content: '记'.repeat(500), importance: 7 })),
+    recentMessages: Array.from({ length: 10 }, (_, index) => ({ role: index % 2 ? 'character' : 'user', text: '话'.repeat(600) }))
+  });
+  if (Buffer.byteLength(boundedLongBody) <= 32_768 || Buffer.byteLength(boundedLongBody) >= 98_304) throw new Error('Long-context smoke fixture is outside the intended request range.');
+  const boundedLongResponse = await fetch(`http://127.0.0.1:${port}/api/chat`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: boundedLongBody
+  });
+  const boundedLongPayload = await boundedLongResponse.json();
+  if (boundedLongResponse.status === 413 || boundedLongPayload.error?.code !== 'provider_unavailable') throw new Error('Bounded long context was rejected before provider fallback.');
   const sceneResponse = await fetch(`http://127.0.0.1:${port}/api/scene`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ scene: { changed: true, location: 'archive', time: 'evening', weather: 'rain', mood: 'quiet' } })

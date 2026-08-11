@@ -90,6 +90,11 @@
     const runtime = apiStatus();
     const onlineMode = mode !== 'offline';
     const tone = onlineMode && runtime.state === 'fallback' ? 'fallback' : onlineMode && (runtime.source === 'gemini' || runtime.configured === true) ? 'live' : 'offline';
+    const fallbackLabel = runtime.errorCode === 'provider_rate_limited'
+      ? langText('Gemini 繁忙 · 本轮离线，下轮自动重试', 'Gemini busy · offline this turn, retrying next turn')
+      : runtime.errorCode === 'request_too_large'
+        ? langText('对话已压缩 · 本轮离线，下轮继续尝试', 'Conversation compacted · offline this turn, retrying next turn')
+        : langText('Gemini 暂时不可用 · 已离线继续', 'Gemini temporarily unavailable · continued offline');
     const label = !onlineMode
       ? langText('离线角色引擎', 'Offline character engine')
       : runtime.state === 'loading'
@@ -97,7 +102,7 @@
         : runtime.source === 'gemini'
           ? langText('Gemini 在线 · 开放对话', 'Gemini live · open conversation')
           : runtime.state === 'fallback'
-            ? langText('Gemini 不可用 · 已离线继续', 'Gemini unavailable · continued offline')
+            ? fallbackLabel
             : runtime.configured === true
               ? langText('Gemini 已连接 · 可以自由对话', 'Gemini connected · open conversation ready')
               : runtime.configured === false
@@ -238,7 +243,10 @@
 
   function notifyProviderFallback(envelope) {
     if (!envelope?.fallback) return;
-    toast(langText('Gemini 暂时不可用；本次已用离线角色逻辑继续，关系与记忆仍保存在本地。', 'Gemini is unavailable; this turn continued with the offline character logic and local relationship memory.'));
+    const limited = envelope.errorCode === 'provider_rate_limited';
+    toast(limited
+      ? langText('Gemini 当前限流；本轮已离线继续，下一条消息会自动重试。完整对话与记忆仍保存在本地。', 'Gemini is rate-limited; this turn continued offline and the next message will retry automatically. The full conversation and memories remain local.')
+      : langText('Gemini 暂时不可用；本次已用离线角色逻辑继续，下一条消息会自动重试。关系与记忆仍保存在本地。', 'Gemini is temporarily unavailable; this turn continued offline and the next message will retry automatically. Relationship memory remains local.'));
   }
 
   function sceneBackgroundKey() {

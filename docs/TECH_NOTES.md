@@ -36,6 +36,8 @@ The implemented feasibility architecture keeps the browser UI separate from ever
 6. Eligible memories enter a visible, source-linked local timeline where the user can edit applicable facts/events or delete any memory.
 7. A separate Cloudflare call occurs only for an actual scene change and reuses the fingerprint cache.
 
-The offline engine remains the default for classroom demos and automated testing. Missing configuration, timeouts, rate limits, malformed output, persistence failures, and scene failures have typed recovery paths.
+The complete transcript and editable memory archive remain local, while each live request uses a fixed byte-bounded rolling context. Current-topic and pinned memories are preferred, so conversation history can grow without making the request grow indefinitely. Oversized requests retry once with an emergency compact context; short-lived Gemini rate limits and provider errors retry within the original timeout. A primary-model 429 automatically tries the configured stable Flash-Lite fallback. A final failure falls back only for that turn and does not disable the next live attempt.
+
+The offline engine remains available for classroom demos and automated testing. Missing configuration, timeouts, rate limits, malformed output, persistence failures, and scene failures have typed recovery paths.
 
 Production relationship and world simulation should treat the exact dimensions, weights, and thresholds as configurable product hypotheses rather than validated psychological measures.

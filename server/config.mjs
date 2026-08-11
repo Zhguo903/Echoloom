@@ -50,6 +50,7 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     gemini: {
       apiKey: clean(env.GEMINI_API_KEY),
       model: clean(env.GEMINI_MODEL) || 'gemini-3.6-flash',
+      fallbackModel: clean(env.GEMINI_FALLBACK_MODEL) || 'gemini-3.5-flash-lite',
       timeoutMs: boundedInteger(env.GEMINI_TIMEOUT_MS, 12_000, 1_000, 30_000)
     },
     supabase: {
@@ -71,7 +72,8 @@ export function providerStatus(config) {
   return {
     gemini: {
       configured: Boolean(config.gemini.apiKey),
-      model: config.gemini.model
+      model: config.gemini.model,
+      fallbackModel: config.gemini.fallbackModel
     },
     persistence: {
       configured: Boolean(config.supabase.url && config.supabase.serviceRoleKey && config.supabase.demoUserId),

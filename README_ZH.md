@@ -56,7 +56,7 @@ npm start
 - Gemini：生成简短角色回复、表情/情绪、关系方向、剧情提议、场景描述、记忆候选和最多三个意图按钮。
 - Supabase（可选）：按当前角色隔离保存消息、关系、故事状态和四类长期记忆。先执行 `supabase/migrations/202608100001_api_foundation.sql`，再执行 `supabase/seed.sql`。
 - Cloudflare Workers AI（可选）：只为已确认的场景变化生成 FLUX 背景；相同提示词直接读取 `.cache/echoloom-scenes`。
-- 任一服务未配置、超时或失败时，会自动使用原有离线角色逻辑或打包背景，不中断故事。
+- 长对话会完整保存在本地，但每次只发送有大小上限的最近对话与相关/置顶记忆；请求过大会自动压缩重试，主模型限流时会自动切换到稳定的 Flash-Lite 备用模型。若本轮仍失败，会使用原有离线角色逻辑继续，下一条消息再次尝试 Gemini，不会把整个会话永久切断。
 
 所有真实密钥只放在被 Git 忽略的 `.env`；浏览器代码不会收到 Gemini、Supabase service role 或 Cloudflare token。完整配置、接口和数据库初始化步骤见 `docs/OPTIONAL_REAL_AI_UPGRADE.md`。
 
@@ -147,7 +147,7 @@ EchoLoom_Interactive_Demo/
 npm test
 ```
 
-测试会检查核心文件、服务器/API 回退、schema v10 与 v9 至 v1 迁移、当前 Gemini Interactions 响应解析、自动在线模式、结构化事件校验、应用规则控制的剧情标记、可追溯记忆、FLUX 场景触发与缓存复用、导入导出、关系信号、同意边界和角色敏感度。
+测试会检查核心文件、服务器/API 回退、长对话上下文预算、413 压缩重试、Gemini 临时限流重试、schema v10 与 v9 至 v1 迁移、当前 Gemini Interactions 响应解析、自动在线模式、结构化事件校验、应用规则控制的剧情标记、可追溯记忆、FLUX 场景触发与缓存复用、导入导出、关系信号、同意边界和角色敏感度。
 
 ## 使用 Codex 修改
 

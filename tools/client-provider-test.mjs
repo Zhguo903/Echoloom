@@ -16,6 +16,7 @@ const liveEvent = {
 
 let fetchMode = 'success';
 let sentBody = null;
+let sentBodies = [];
 let sceneCalls = 0;
 const offline = {
   storyReply: () => ({ response: 'offline story', relationshipDelta: { trust: 0 }, behaviourTags: [], playerSignalDelta: {} }),
@@ -41,7 +42,9 @@ const context = vm.createContext({
       return new Response(JSON.stringify({ fingerprint: 'a'.repeat(64), image: `/api/scenes/${'a'.repeat(64)}.jpg`, cached: true }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     sentBody = JSON.parse(options.body);
+    sentBodies.push(sentBody);
     if (fetchMode === 'failure') return new Response(JSON.stringify({ error: { code: 'provider_unavailable', message: 'not configured' }, fallback: 'offline' }), { status: 503, headers: { 'content-type': 'application/json' } });
+    if (fetchMode === 'oversized-once' && sentBodies.length === 1) return new Response(JSON.stringify({ error: { code: 'request_too_large', message: 'too large' } }), { status: 413, headers: { 'content-type': 'application/json' } });
     return new Response(JSON.stringify({ event: liveEvent, meta: { model: 'gemini-test' } }), { status: 200, headers: { 'content-type': 'application/json' } });
   },
   window: {
@@ -80,6 +83,36 @@ const autoEnvelope = await api.reply('chatReply', '你今天在做什么？', en
 assert.equal(autoEnvelope.source, 'gemini');
 assert.equal(sentBody.message, '你今天在做什么？');
 
+const longEngineState = {
+  ...engineState,
+  memories: Array.from({ length: 100 }, (_, index) => ({
+    id: `memory-${index}`,
+    text: { zh: `${index === 73 ? '用户一直想去看极光。' : '普通关系记忆'}${'记'.repeat(360)}`, en: `Relationship memory ${index}` },
+    source: { zh: '长期聊天记录', en: 'Long conversation' },
+    type: 'relationship', importance: index === 73 ? 9 : 6, pinned: index === 4
+  })),
+  chatMessages: Array.from({ length: 180 }, (_, index) => ({
+    role: index % 2 ? 'character' : 'user',
+    text: { zh: `第${index}轮${'对话'.repeat(240)}`, en: `Conversation turn ${index}` }
+  }))
+};
+sentBodies = [];
+const longEnvelope = await api.reply('chatReply', '你还记得我想去看极光吗？', longEngineState, { aiMode: 'live', minimumDelay: 0 });
+assert.equal(longEnvelope.source, 'gemini');
+assert.ok(Buffer.byteLength(JSON.stringify(sentBody)) <= 28_000);
+assert.ok(sentBody.memories.length <= 16);
+assert.ok(sentBody.recentMessages.length <= 20);
+assert.ok(sentBody.memories.some((memory) => memory.content.includes('极光')));
+
+fetchMode = 'oversized-once';
+sentBodies = [];
+const recoveredEnvelope = await api.reply('chatReply', '继续刚才的话题', engineState, { aiMode: 'live', minimumDelay: 0 });
+assert.equal(recoveredEnvelope.source, 'gemini');
+assert.equal(sentBodies.length, 2);
+assert.ok(sentBodies[1].memories.length <= 6);
+assert.ok(sentBodies[1].recentMessages.length <= 10);
+assert.equal(api.status().state, 'ready');
+
 const skippedScene = await api.generateSceneBackground({ changed: false, location: 'archive' }, { aiMode: 'live', characterId: 'qian' });
 assert.equal(skippedScene.skipped, true);
 assert.equal(sceneCalls, 0);
@@ -89,10 +122,11 @@ assert.equal(liveScene.image, `/api/scenes/${'a'.repeat(64)}.jpg`);
 assert.equal(sceneCalls, 1);
 
 fetchMode = 'failure';
+sentBodies = [];
 const fallbackEnvelope = await api.reply('chatReply', 'still here', engineState, { aiMode: 'live', minimumDelay: 0 });
 assert.equal(fallbackEnvelope.fallback, true);
 assert.equal(fallbackEnvelope.result.response, 'offline chat');
 assert.equal(api.status().state, 'fallback');
 
 console.log('EchoLoom browser provider adapter test: PASS');
-console.log('Checked forced offline mode, provider discovery, automatic Gemini mode, localized multi-turn context, live event mapping, scene-change gating, cached background mapping, and typed provider fallback.');
+console.log('Checked forced offline mode, provider discovery, automatic Gemini mode, bounded long-conversation context, relevant-memory selection, 413 compact retry, live event mapping, scene-change gating, cached background mapping, and typed provider fallback.');

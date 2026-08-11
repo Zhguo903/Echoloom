@@ -1,4 +1,4 @@
-const CACHE = 'echoloom-demo-v56';
+const CACHE = 'echoloom-demo-v57';
 const ASSETS = [
   './',
   './index.html',
@@ -7,8 +7,8 @@ const ASSETS = [
   './app/storage.js?v=15',
   './app/story-engine.js?v=7',
   './app/reply-timing.js?v=2',
-  './app/api-engine.js?v=4',
-  './app/app.js?v=37',
+  './app/api-engine.js?v=5',
+  './app/app.js?v=38',
   './assets/brand/echoloom-lockup.png',
   './assets/brand/echoloom-mark.png',
   './assets/brand/echoloom-app-icon.png',

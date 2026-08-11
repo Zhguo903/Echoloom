@@ -23,7 +23,7 @@ npm start
 - Gemini returns a validated structured Game Event for Story, Chat, generated-scene chat, and private EchoLink replies.
 - Supabase can persist isolated character context, relationship changes, story state, messages, and meaningful memories.
 - Cloudflare Workers AI can generate a background only when a validated event changes the scene; identical prompts reuse a local fingerprint cache.
-- A missing, timed-out, or failed provider automatically falls back to the packaged offline experience. Secrets remain in `.env` and never enter browser JavaScript.
+- Long conversations keep the full local transcript while sending only a bounded recent-and-relevant context window. Oversized requests retry automatically; a primary-model rate limit switches to a stable Flash-Lite fallback. A final provider failure falls back for that turn and the next message tries live mode again. Secrets remain in `.env` and never enter browser JavaScript.
 
 Apply `supabase/migrations/202608100001_api_foundation.sql`, then `supabase/seed.sql`, before enabling Supabase. See `docs/OPTIONAL_REAL_AI_UPGRADE.md` for exact setup and API contracts.
 

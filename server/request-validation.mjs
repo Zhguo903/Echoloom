@@ -43,7 +43,7 @@ export function validateChatRequest(value) {
     role: item?.role === 'character' ? 'character' : 'user',
     text: clean(item?.text, 600)
   })).filter((item) => item.text) : [];
-  const memories = Array.isArray(body.memories) ? body.memories.slice(0, 80).map((item) => ({
+  const memories = Array.isArray(body.memories) ? body.memories.slice(0, 32).map((item) => ({
     id: clean(item?.id, 100),
     content: clean(item?.content ?? item?.text?.zh ?? item?.text?.en ?? item?.text, 500),
     memoryType: clean(item?.memoryType ?? item?.memory_type ?? item?.type, 40),

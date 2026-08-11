@@ -24,7 +24,7 @@ free-text input
 ## Local setup
 
 1. Copy `.env.example` to `.env`. The zero-dependency server reads `.env` automatically; process environment variables take precedence.
-2. Add `GEMINI_API_KEY` to enable live dialogue. `GEMINI_MODEL` is configurable and defaults to `gemini-3.6-flash`.
+2. Add `GEMINI_API_KEY` to enable live dialogue. `GEMINI_MODEL` defaults to `gemini-3.6-flash`; `GEMINI_FALLBACK_MODEL` defaults to the stable, higher-throughput `gemini-3.5-flash-lite` and is tried when the primary model returns 429.
 3. Optionally add Supabase and/or Cloudflare values described below.
 4. Run `npm start`. Schema v10's default **Automatic** mode detects the server key and enables Gemini; Settings also offers **Always try Gemini** and **Force offline simulation**. Never open a live test by serving the browser files from a different server.
 
@@ -51,7 +51,9 @@ The migration creates users, worlds, characters, relationships, chat messages, m
 
 ## Gemini Game Event
 
-`POST /api/chat` accepts only a known character ID, a 1–1000 character message, up to 24 recent messages, and the current branch. The server retrieves at most six relevant non-obsolete memories and builds the official persona prompt. It requests JSON structured output, reads the current Interactions `steps[].content[]` response, then validates it again before use. The prompt must answer the current message first, treats terse clarification as a follow-up to the latest character reply, permits ordinary conversation, and forbids repeating recent character output.
+`POST /api/chat` accepts only a known character ID, a 1–1000 character message, up to 24 recent messages, and the current branch. The complete transcript stays in local state; the browser sends a rolling context of at most 20 recent turns plus up to 16 byte-bounded memories ranked by pinning, current-topic relevance, importance, and recency. The normal serialized request is capped at 28 KB. The server's 96 KiB envelope leaves compatibility headroom while field-level validation remains authoritative, then retrieves at most six relevant non-obsolete memories and builds the official persona prompt.
+
+If a request still receives HTTP 413, the browser automatically retries once with at most 10 turns and six compact memories. Gemini 408, 429, and 5xx responses retry up to two times within the original request timeout, respecting a bounded `Retry-After` delay. A primary-model 429 switches the next attempt to `GEMINI_FALLBACK_MODEL`; the response metadata records the model that actually succeeded. If those attempts still fail, only the current turn uses the offline engine; the next message automatically attempts Gemini again. Successful responses use JSON structured output, read the current Interactions `steps[].content[]` response, and are validated again before use. The prompt must answer the current message first, treats terse clarification as a follow-up to the latest character reply, permits ordinary conversation, and forbids repeating recent character output.
 
 The normalized event contains:
 
@@ -117,6 +119,7 @@ The response URL is `GET /api/scenes/<sha256>.jpg`. The fingerprint makes identi
 
 - Gemini, Supabase service-role, and Cloudflare credentials exist only in the Node process.
 - User and model strings are bounded; UI output is HTML-escaped.
+- Live request size is independent of total transcript length; long local histories are reduced to a recent-and-relevant context window without deleting user data.
 - Each request receives only the selected character's context. EchoLink group rules, delayed delivery, permissions, and private intent separation remain deterministic.
 - Story progress, memory acceptance, relationship agreements, consent, and unlocks are application-owned. A relationship delta cannot confirm romance or exclusivity.
 - The offline demo, import/export, and packaged assets continue to work with every provider disabled.

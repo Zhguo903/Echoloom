@@ -39,8 +39,13 @@ export async function createChatEvent(payload, config, { fetchImpl = fetch } = {
     memories: retrieveMemories(requestData.message, sourceMemories, 6),
     recentMessages: persistedContext?.recentMessages?.length ? persistedContext.recentMessages : requestData.recentMessages
   };
+  let providerModel = config.gemini.model;
   const event = applyStoryRules(
-    await requestGeminiEvent(buildNpcPrompt(context), config.gemini, { fetchImpl, allowedFlags: ALLOWED_STORY_FLAGS }),
+    await requestGeminiEvent(buildNpcPrompt(context), config.gemini, {
+      fetchImpl,
+      allowedFlags: ALLOWED_STORY_FLAGS,
+      onModelUsed: (model) => { providerModel = model; }
+    }),
     requestData,
     context
   );
@@ -55,7 +60,7 @@ export async function createChatEvent(payload, config, { fetchImpl = fetch } = {
     event,
     meta: {
       provider: 'gemini',
-      model: config.gemini.model,
+      model: providerModel,
       characterId: requestData.characterId,
       memoryCount: context.memories.length,
       persisted: Boolean(persistence),

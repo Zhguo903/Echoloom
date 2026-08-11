@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createChatEvent } from '../server/chat-service.mjs';
 import { loadConfig } from '../server/config.mjs';
 import { validateGameEvent } from '../server/game-event.mjs';
-import { outputText } from '../server/gemini.mjs';
+import { outputText, requestGeminiEvent } from '../server/gemini.mjs';
 import { retrieveMemories } from '../server/memory-retrieval.mjs';
 import { validateChatRequest } from '../server/request-validation.mjs';
 import { applyStoryRules } from '../server/story-rules.mjs';
@@ -95,5 +95,31 @@ assert.equal(result.event.story.chapter, 'chapter_2');
 assert.equal(result.event.story.scene, 'archive');
 assert.equal(result.event.story.flags.shared_memory_acknowledged, true);
 
+let retryCalls = 0;
+const retryModels = [];
+let recoveredModel = '';
+const retriedEvent = await requestGeminiEvent('retry test', { ...config.gemini, timeoutMs: 5_000 }, {
+  allowedFlags: ['shared_memory_acknowledged'],
+  onModelUsed: (model) => { recoveredModel = model; },
+  fetchImpl: async (_url, options) => {
+    retryCalls += 1;
+    retryModels.push(JSON.parse(options.body).model);
+    if (retryCalls === 1) {
+      return new Response(JSON.stringify({ error: { message: 'Please retry.' } }), {
+        status: 429,
+        headers: { 'content-type': 'application/json', 'retry-after': '0' }
+      });
+    }
+    return new Response(JSON.stringify({ steps: [{ type: 'model_output', content: [{ type: 'text', text: JSON.stringify(rawEvent) }] }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+});
+assert.equal(retryCalls, 2);
+assert.deepEqual(retryModels, ['gemini-test', 'gemini-3.5-flash-lite']);
+assert.equal(recoveredModel, 'gemini-3.5-flash-lite');
+assert.equal(retriedEvent.dialogue, rawEvent.dialogue);
+
 console.log('EchoLoom API boundary test: PASS');
-console.log('Checked request isolation, keyword memory retrieval, current Interactions steps parsing, conversational relevance instructions, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');
+console.log('Checked request isolation, keyword memory retrieval, current Interactions steps parsing, rate-limit model failover, conversational relevance instructions, semantic validation, application-owned story flags, canonical chapter state, and relationship clamping.');

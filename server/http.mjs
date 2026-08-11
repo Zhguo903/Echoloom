@@ -1,4 +1,4 @@
-export async function readJsonBody(request, maximumBytes = 32_768) {
+export async function readJsonBody(request, maximumBytes = 98_304) {
   let size = 0;
   const chunks = [];
   for await (const chunk of request) {
@@ -29,4 +29,3 @@ export function sendJson(response, status, value) {
   });
   response.end(JSON.stringify(value));
 }
-

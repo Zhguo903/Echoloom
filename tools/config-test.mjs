@@ -14,6 +14,7 @@ assert.equal(parsed.CLOUDFLARE_ACCOUNT_ID, 'account-test');
 
 const config = loadConfig({ ...parsed, CLOUDFLARE_API_TOKEN: 'token-test' }, '/tmp/echoloom-config-test');
 assert.equal(config.gemini.apiKey, 'gemini-test');
+assert.equal(config.gemini.fallbackModel, 'gemini-3.5-flash-lite');
 assert.equal(config.supabase.url, 'https://example.supabase.co');
 const status = providerStatus(config);
 assert.equal(status.gemini.configured, true);
@@ -22,4 +23,4 @@ assert.equal(JSON.stringify(status).includes('gemini-test'), true);
 assert.equal(JSON.stringify(status).includes('token-test'), false);
 
 console.log('EchoLoom environment configuration test: PASS');
-console.log('Checked dependency-free .env parsing, bounded provider configuration, and secret-free status output.');
+console.log('Checked dependency-free .env parsing, primary/fallback model configuration, bounded provider settings, and secret-free status output.');
