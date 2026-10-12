@@ -4,10 +4,11 @@
 
 - Static HTML, CSS, and JavaScript.
 - No build step and no third-party runtime dependency.
-- State is stored in browser `localStorage` under `echoloom.demo.v2` and migrates through schema version 11. Automatic mode uses Gemini when the local server reports a configured key and otherwise remains offline.
+- State is stored in browser `localStorage` under `echoloom.demo.v2` and migrates through schema version 12. User-facing free-form character replies always try Gemini first; unavailable providers fall back locally for that turn.
 - The default scene generator is deterministic and keyword-based. Optional live events can request a server-generated FLUX background only after `scene.changed`, with a SHA-256 disk cache and packaged fallback.
 - Content is separated into `app/data.js` to keep bilingual copy, character profiles, journey defaults, and scene metadata editable.
-- Schema version 11 stores separate journeys for Qi An, Shen Yao, Li Chuan, Zhou Tang, and Wen Sheng plus automatic/live/offline preference, bilingual generated dialogue/choices/memories, live story/scene metadata, opening decisions, EchoLink, shared campaign, and recoverable archive state.
+- Schema version 12 stores separate journeys for Qi An, Shen Yao, Li Chuan, Zhou Tang, and Wen Sheng plus a normalized Gemini-first provider marker, bilingual generated dialogue/choices/memories, live story/scene metadata, opening decisions, EchoLink, shared campaign, recoverable archive state, and canonical per-chapter clue/interaction/consequence progress.
+- Investigation chapters use the shared phase contract `entry → investigation → anomaly → conversation → decision → result`, while retaining distinct mechanics. Free text is collapsed by default inside the conversation beat; only application-owned scene actions can confirm canonical evidence.
 - The app uses a small state machine rather than URL routing.
 - Opening chapters and generated scenes use a cinematic spotlight only before the first player message. Once conversation begins, every character and player message stays in one insertion-ordered history so a reply cannot appear above the message that triggered it.
 - The service worker caches the prototype when served over HTTP.

@@ -4,3 +4,4 @@ await import('./api-test.mjs');
 await import('./client-provider-test.mjs');
 await import('./scene-test.mjs');
 await import('./config-test.mjs');
+await import('./public-test.mjs');

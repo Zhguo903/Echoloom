@@ -1,11 +1,11 @@
 {
-  "name": "EchoLoom Interactive Demo",
+  "name": "EchoLoom · Stories worth remembering",
   "short_name": "EchoLoom",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0f1324",
-  "theme_color": "#0f1324",
-  "description": "A story-first AI relationship product prototype.",
+  "background_color": "#fbf8f1",
+  "theme_color": "#fbf8f1",
+  "description": "A bilingual interactive story with independent characters and private local saves.",
   "icons": [
     {
       "src": "assets/brand/echoloom-app-icon.png",

@@ -8,6 +8,7 @@
     "start": "node tools/server.mjs --open",
     "dev": "node tools/server.mjs --open",
     "serve": "node tools/server.mjs",
+    "build:public": "node tools/build-public.mjs",
     "test": "node tools/test.mjs"
   },
   "engines": {

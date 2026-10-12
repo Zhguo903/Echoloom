@@ -9,6 +9,8 @@
 
   let state = window.EchoStorage.load();
   let isTyping = false;
+  let characterReplySequence = 0;
+  let sceneGenerationSequence = 0;
   let isGenerating = false;
   let modalContext = null;
   let splashTimer = null;
@@ -168,7 +170,7 @@
 
   function apiOptions(extra = {}) {
     return {
-      aiMode: state.settings?.aiMode || 'auto',
+      aiMode: window.ECHOLOOM_PUBLIC?.offlineOnly ? 'offline' : 'live',
       playerName: state.playerName || '',
       playerIntent: extra.playerIntent || '',
       scene: extra.scene || null,
@@ -181,18 +183,15 @@
   }
 
   function providerStatusMarkup() {
-    const mode = state.settings?.aiMode || 'auto';
+    if (window.ECHOLOOM_PUBLIC?.offlineOnly) return `<div class="provider-status offline" role="status"><i></i><span>${esc(langText('故事体验版 · 对话在本机生成', 'Story edition · replies generated on your device'))}</span></div>`;
     const runtime = apiStatus();
-    const onlineMode = mode !== 'offline';
-    const tone = onlineMode && runtime.state === 'fallback' ? 'fallback' : onlineMode && (runtime.source === 'gemini' || runtime.configured === true) ? 'live' : 'offline';
+    const tone = runtime.state === 'fallback' ? 'fallback' : (runtime.source === 'gemini' || runtime.configured === true) ? 'live' : 'offline';
     const fallbackLabel = runtime.errorCode === 'provider_rate_limited'
       ? langText('Gemini 繁忙 · 本轮离线，下轮自动重试', 'Gemini busy · offline this turn, retrying next turn')
       : runtime.errorCode === 'request_too_large'
         ? langText('对话已压缩 · 本轮离线，下轮继续尝试', 'Conversation compacted · offline this turn, retrying next turn')
         : langText('Gemini 暂时不可用 · 已离线继续', 'Gemini temporarily unavailable · continued offline');
-    const label = !onlineMode
-      ? langText('离线角色引擎', 'Offline character engine')
-      : runtime.state === 'loading'
+    const label = runtime.state === 'loading'
         ? langText('Gemini 正在生成', 'Gemini is generating')
         : runtime.source === 'gemini'
           ? langText('Gemini 在线 · 开放对话', 'Gemini live · open conversation')
@@ -201,7 +200,7 @@
             : runtime.configured === true
               ? langText('Gemini 已连接 · 可以自由对话', 'Gemini connected · open conversation ready')
               : runtime.configured === false
-                ? langText('自动模式 · 当前使用离线引擎', 'Automatic mode · currently using offline engine')
+                ? langText('Gemini 未连接 · 当前使用离线保底', 'Gemini unavailable · using offline fallback')
                 : langText('正在检查 Gemini 配置', 'Checking Gemini configuration');
     return `<div class="provider-status ${tone}" role="status"><i></i><span>${esc(label)}</span></div>`;
   }
@@ -314,6 +313,8 @@
   function requestLiveSceneBackground(result, journey, context = {}) {
     const scene = result?.gameEvent?.scene;
     if (result?.provider !== 'gemini' || scene?.changed !== true || !journey?.liveScene) return;
+    const requestState = state;
+    const requestBranch = state.campaign.activeBranchId;
     const requestId = `scene-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     journey.liveScene = {
       status: 'loading', fingerprint: null, image: null,
@@ -321,11 +322,11 @@
       cached: false, requestedAt: new Date().toISOString(), requestId
     };
     window.EchoApiEngine.generateSceneBackground(scene, {
-      aiMode: state.settings?.aiMode || 'auto',
+      aiMode: 'live',
       characterId: context.characterId || state.activeCharacterId,
       language: state.language
     }).then((background) => {
-      if (journey.liveScene?.requestId !== requestId) return;
+      if (state !== requestState || state.campaign.activeBranchId !== requestBranch || journey.liveScene?.requestId !== requestId) return;
       if (background?.image) {
         journey.liveScene = {
           ...journey.liveScene,
@@ -352,7 +353,7 @@
     const screen = state.screen;
     const mainline = state.campaign?.mainline || {};
     const weaver = state.campaign?.weaver || {};
-    const phase = mainline.phase || 'briefing';
+    const phase = mainline.phase || 'entry';
     const chapterIndex = Math.max(0, Number(mainline.chapterIndex || 0));
 
     if (screen === 'prologue') return 'fate-observatory';
@@ -361,7 +362,6 @@
     }
     if (screen === 'mainline-chapter') {
       if (['finale', 'resolved'].includes(phase) || chapterIndex >= 3) return 'main-mirror-tribunal';
-      if (chapterIndex === 0 && phase === 'sample') return 'rainy-old-station';
       if (chapterIndex === 0) return 'private-archive';
       if (chapterIndex === 1) return 'memory-repair-lab';
       if (chapterIndex === 2) return 'echolink-space';
@@ -492,7 +492,7 @@
 
   function dialogueCard(message) {
     const character = activeCharacter();
-    return `<div class="dialogue-card"><div class="dialogue-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="dialogue-copy"><strong>${esc(localText(character.name))}</strong>${message.provider === 'gemini' ? `<small class="npc-state-label">${esc(langText(`Gemini · ${message.emotion || message.expression || 'neutral'}`, `Gemini · ${message.emotion || message.expression || 'neutral'}`))}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.memoryRef ? `<span class="memory-reference">${icon('memory',10)}${esc(t('mentionMemory'))}</span>` : ''}${message.relationshipNote ? `<span class="relationship-shift-note">${esc(localText(message.relationshipNote))}</span>` : ''}</div></div>`;
+    return `<div class="dialogue-card"><div class="dialogue-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="dialogue-copy"><strong>${esc(localText(character.name))}</strong><p>${esc(localText(message.text))}</p>${message.memoryRef ? `<span class="memory-reference">${icon('memory',10)}${esc(t('mentionMemory'))}</span>` : ''}${message.relationshipNote ? `<span class="relationship-shift-note">${esc(localText(message.relationshipNote))}</span>` : ''}</div></div>`;
   }
 
   function storyHistoryMessage(message) {
@@ -697,7 +697,7 @@
     const system = message.sender === 'system';
     const senderName = self || system ? '' : echoContactName(message.sender);
     const typeLabel = message.type === 'voice' ? `▸ ${langText('语音留言', 'Voice note')}` : message.type === 'photo' ? `▧ ${langText('照片', 'Photo')}` : message.type === 'call' ? `☎ ${langText('通话记录', 'Call record')}` : '';
-    return `<div class="echo-message ${self ? 'self' : system ? 'system' : 'other'}">${thread.type === 'group' && senderName ? `<span class="echo-sender">${esc(senderName)}</span>` : ''}<div>${typeLabel ? `<small>${esc(typeLabel)}</small>` : ''}${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.relationshipNote ? `<small class="relationship-shift-note">${esc(localText(message.relationshipNote))}</small>` : ''}<time>${esc(message.time || '')}</time></div></div>`;
+    return `<div class="echo-message ${self ? 'self' : system ? 'system' : 'other'}">${thread.type === 'group' && senderName ? `<span class="echo-sender">${esc(senderName)}</span>` : ''}<div>${typeLabel ? `<small>${esc(typeLabel)}</small>` : ''}<p>${esc(localText(message.text))}</p>${message.relationshipNote ? `<small class="relationship-shift-note">${esc(localText(message.relationshipNote))}</small>` : ''}<time>${esc(message.time || '')}</time></div></div>`;
   }
 
   function renderEchoTyping(thread) {
@@ -845,7 +845,7 @@
   function chatMessage(message) {
     if (message.role === 'user') return `<div class="chat-message-row user"><div class="chat-bubble">${esc(localText(message.text))}</div></div>`;
     const character = activeCharacter();
-    return `<div class="chat-message-row character"><div class="chat-mini-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="chat-bubble">${message.provider === 'gemini' ? `<small class="npc-state-label">Gemini · ${esc(message.emotion || message.expression || 'neutral')}</small>` : ''}${esc(localText(message.text))}${message.memoryRef ? `<div class="chat-memory-ref">${icon('memory',10)}<span>${esc(t('mentionMemory'))}</span></div>` : ''}${message.relationshipNote ? `<div class="relationship-shift-note">${esc(localText(message.relationshipNote))}</div>` : ''}<div class="message-actions"><button class="message-action" type="button" data-action="save-message-memory" data-message-id="${esc(message.id)}">${esc(t('saveEcho'))}</button></div></div></div>`;
+    return `<div class="chat-message-row character"><div class="chat-mini-avatar expression-${esc(message.expression || activeJourney()?.liveExpression || 'neutral')}"><img src="${esc(characterAvatar(character))}" alt=""></div><div class="chat-bubble">${esc(localText(message.text))}${message.memoryRef ? `<div class="chat-memory-ref">${icon('memory',10)}<span>${esc(t('mentionMemory'))}</span></div>` : ''}${message.relationshipNote ? `<div class="relationship-shift-note">${esc(localText(message.relationshipNote))}</div>` : ''}<div class="message-actions"><button class="message-action" type="button" data-action="save-message-memory" data-message-id="${esc(message.id)}">${esc(t('saveEcho'))}</button></div></div></div>`;
   }
 
   function renderThreads() {
@@ -925,7 +925,15 @@
   function renderSettings() {
     const backRoute = state.resumeScreen && state.resumeScreen !== 'settings' ? state.resumeScreen : (state.onboardingCompleted ? 'observatory-home' : 'title');
     const known = characterIds.filter((id) => state.journeys?.[id]?.met).map((id) => localText(characters[id].name)).join(' · ');
-    return `<section class="app-screen settings-screen">${topBar(t('settings'), '', backRoute, 'none')}<div class="settings-content"><section class="settings-section"><h2>${esc(t('language'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('language'))}</strong><span>English / 中文</span></div><select id="language-select"><option value="zh" ${state.language === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div></section><section class="settings-section"><h2>${esc(langText('角色生成方式', 'Character response provider'))}</h2>${providerStatusMarkup()}<div class="setting-row"><div class="setting-copy"><strong>${esc(langText('对话引擎', 'Dialogue engine'))}</strong><span>${esc(langText('自动模式检测服务端 Key；在线失败会继续离线故事。', 'Automatic mode detects the server key; online failures continue the offline story.'))}</span></div><select id="ai-mode-select"><option value="auto" ${(state.settings.aiMode || 'auto') === 'auto' ? 'selected' : ''}>${esc(langText('自动选择（推荐）', 'Automatic (recommended)'))}</option><option value="live" ${state.settings.aiMode === 'live' ? 'selected' : ''}>${esc(langText('始终尝试 Gemini', 'Always try Gemini'))}</option><option value="offline" ${state.settings.aiMode === 'offline' ? 'selected' : ''}>${esc(langText('强制离线演绎', 'Force offline simulation'))}</option></select></div><div class="data-note">${esc(langText('通过 npm start 打开后，有效的 Gemini Key 会自动启用开放式多轮对话。角色上下文按人物隔离；API 密钥不会进入浏览器。', 'When opened through npm start, a valid Gemini key automatically enables open multi-turn conversation. Character context is isolated per person and API keys never enter the browser.'))}</div></section><section class="settings-section"><h2>${esc(t('notificationFrequency'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('notificationFrequency'))}</strong><span>${esc(t(state.settings.frequency))}</span></div><select id="frequency-select"><option value="gentle" ${state.settings.frequency === 'gentle' ? 'selected' : ''}>${esc(t('gentle'))}</option><option value="normal" ${state.settings.frequency === 'normal' ? 'selected' : ''}>${esc(t('normal'))}</option><option value="quiet" ${state.settings.frequency === 'quiet' ? 'selected' : ''}>${esc(t('quiet'))}</option></select></div><div class="setting-row"><div class="setting-copy"><strong>${esc(t('reduceMotion'))}</strong><span>${esc(langText('减少页面切换与装饰动画。', 'Use fewer transitions and animations.'))}</span></div><button class="toggle ${state.settings.reduceMotion ? 'on' : ''}" type="button" data-action="toggle-motion" aria-pressed="${state.settings.reduceMotion}"><span></span></button></div></section><section class="settings-section"><h2>${esc(langText('故事流程', 'Story flow'))}</h2><div class="data-note">${esc(known ? langText(`当前已认识：${known}`, `Currently known: ${known}`) : langText('尚未完成首次相遇。', 'The first encounter is not complete.'))}</div><button class="secondary-button settings-button" type="button" data-action="restart-onboarding">${esc(langText('重新开始新手剧情', 'Restart onboarding'))}</button><button class="secondary-button settings-button" type="button" data-action="return-title">${esc(langText('返回标题页', 'Return to title'))}</button></section><section class="settings-section"><h2>${esc(langText('关系与分支数据', 'Relationship and branch data'))}</h2><div class="data-note">${esc(t('dataLocal'))}</div><button class="secondary-button settings-button" type="button" data-action="export">${icon('download',14)} ${esc(t('export'))}</button><label class="secondary-button settings-button" for="import-file" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">${icon('upload',14)} ${esc(t('import'))}</label><button class="settings-button danger" type="button" data-action="clear-archive">${esc(langText('清除分支档案', 'Clear branch archive'))}</button><button class="settings-button danger" type="button" data-action="reset">${esc(t('reset'))}</button>${state.legacyArchive ? `<p class="legacy-note">${esc(t('archivedLegacy'))}</p>` : ''}</section></div></section>`;
+    const publicEdition = Boolean(window.ECHOLOOM_PUBLIC?.offlineOnly);
+    const engineExplanation = publicEdition
+      ? langText('公开体验版使用本机故事引擎。角色回应遵循预设故事与记忆规则，无需账号或 API 密钥。', 'The public edition uses a local story engine. Replies follow story and memory rules; no account or API key is needed.')
+      : langText('所有自由对话优先请求 Gemini。发送的内容包括当前消息、近期对话与相关角色记忆；服务不可用时离线继续。', 'Free-form replies try Gemini first, sending your message, recent dialogue, and relevant character memories. Unavailable requests continue offline.');
+    const engineBadge = publicEdition ? langText('本机生成', 'On-device') : langText('Gemini 优先', 'Gemini first');
+    const engineNote = publicEdition
+      ? langText('对话、记忆与分支只保存在此浏览器。清理网站数据会移除存档；换设备前请先导出。角色是虚构的 AI 角色。', 'Conversations, memories, and branches stay in this browser. Clearing site data removes saves; export before switching devices. Characters are fictional AI characters.')
+      : langText('本地开发模式；密钥只在服务端。启用在线提供方时，对话上下文会由该提供方处理。', 'Local development mode; keys stay server-side. An enabled online provider processes conversation context.');
+    return `<section class="app-screen settings-screen">${topBar(t('settings'), '', backRoute, 'none')}<div class="settings-content"><section class="settings-section"><h2>${esc(t('language'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('language'))}</strong><span>English / 中文</span></div><select id="language-select"><option value="zh" ${state.language === 'zh' ? 'selected' : ''}>中文</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div></section><section class="settings-section"><h2>${esc(langText('角色生成方式', 'Character response provider'))}</h2>${providerStatusMarkup()}<div class="setting-row"><div class="setting-copy"><strong>${esc(langText('对话引擎', 'Dialogue engine'))}</strong><span>${esc(engineExplanation)}</span></div><span class="engine-fixed-badge">${esc(engineBadge)}</span></div><div class="data-note">${esc(engineNote)}</div></section><section class="settings-section"><h2>${esc(t('notificationFrequency'))}</h2><div class="setting-row"><div class="setting-copy"><strong>${esc(t('notificationFrequency'))}</strong><span>${esc(t(state.settings.frequency))}</span></div><select id="frequency-select"><option value="gentle" ${state.settings.frequency === 'gentle' ? 'selected' : ''}>${esc(t('gentle'))}</option><option value="normal" ${state.settings.frequency === 'normal' ? 'selected' : ''}>${esc(t('normal'))}</option><option value="quiet" ${state.settings.frequency === 'quiet' ? 'selected' : ''}>${esc(t('quiet'))}</option></select></div><div class="setting-row"><div class="setting-copy"><strong>${esc(t('reduceMotion'))}</strong><span>${esc(langText('减少页面切换与装饰动画。', 'Use fewer transitions and animations.'))}</span></div><button class="toggle ${state.settings.reduceMotion ? 'on' : ''}" type="button" data-action="toggle-motion" aria-pressed="${state.settings.reduceMotion}"><span></span></button></div></section><section class="settings-section"><h2>${esc(langText('故事流程', 'Story flow'))}</h2><div class="data-note">${esc(known ? langText(`当前已认识：${known}`, `Currently known: ${known}`) : langText('尚未完成首次相遇。', 'The first encounter is not complete.'))}</div><button class="secondary-button settings-button" type="button" data-action="restart-onboarding">${esc(langText('重新开始新手剧情', 'Restart onboarding'))}</button><button class="secondary-button settings-button" type="button" data-action="website-home">${esc(langText('返回网站首页', 'Website home'))}</button><button class="secondary-button settings-button" type="button" data-action="return-title">${esc(langText('返回标题页', 'Return to title'))}</button></section><section class="settings-section"><h2>${esc(langText('关系与分支数据', 'Relationship and branch data'))}</h2><div class="data-note">${esc(t('dataLocal'))}</div><button class="secondary-button settings-button" type="button" data-action="export">${icon('download',14)} ${esc(t('export'))}</button><label class="secondary-button settings-button" for="import-file" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">${icon('upload',14)} ${esc(t('import'))}</label><button class="settings-button danger" type="button" data-action="clear-archive">${esc(langText('清除分支档案', 'Clear branch archive'))}</button><button class="settings-button danger" type="button" data-action="reset">${esc(t('reset'))}</button>${state.legacyArchive ? `<p class="legacy-note">${esc(t('archivedLegacy'))}</p>` : ''}</section></div></section>`;
   }
 
   function renderBrandSplash() {
@@ -1117,10 +1125,16 @@
         description: localText(chapter.anchor.proves), next: localText(chapter.anchor.next), action: localText(chapter.nextAction), actionId: 'mainline-open'
       };
     }
-    if (progress.phase === 'sample') {
+    if (['investigation', 'anomaly', 'conversation', 'decision'].includes(progress.phase)) {
+      const nextByPhase = {
+        investigation: chapter.experience.investigation.title,
+        anomaly: chapter.experience.anomaly.title,
+        conversation: langText(`听取${localText(characters[chapter.characterId].name)}的判断。`, `Hear ${localText(characters[chapter.characterId].name)}'s judgement.`),
+        decision: langText('决定如何保留本章发现。', 'Decide how to preserve this chapter’s findings.')
+      };
       return {
-        overline: langText(`当前主线 · 第 ${chapter.number} 章`, `Current mainline · Chapter ${chapter.number}`), title: langText('核对共同记忆', 'Verify the shared memory'),
-        description: localText(chapter.scene), next: localText(chapter.sample.prompt), action: localText(chapter.investigationAction), actionId: 'mainline-open'
+        overline: langText(`当前主线 · 第 ${chapter.number} 章`, `Current mainline · Chapter ${chapter.number}`), title: localText(chapter.experience.mystery),
+        description: localText(chapter.experience.entry.text), next: localText(nextByPhase[progress.phase]), action: langText('继续现场调查', 'Continue the scene'), actionId: 'mainline-open'
       };
     }
     return {
@@ -1129,7 +1143,7 @@
     };
   }
 
-  function renderMainlineChapter() {
+  function renderLegacyMainlineChapter() {
     const progress = mainlineState();
     const chapter = currentMainlineChapter();
     const character = characters[chapter.characterId];
@@ -1142,6 +1156,109 @@
     const resolvedOutcome = mainlineContent.finale.outcomes[progress.finalDecision];
     const resolvedBlock = progress.phase === 'resolved' && resolvedOutcome ? `<div class="mainline-resolved"><span>✦</span><h1>${esc(localText(resolvedOutcome.title))}</h1><p>${esc(localText(resolvedOutcome.text))}</p><section><strong>${esc(langText('EchoLink · 许澄', 'EchoLink · Xu Cheng'))}</strong><p>${esc(langText('终于重新连接上了。先不要把我只当成一份恢复成功的档案——织界室里，还有一个人没有来得及成为“谁”。', 'We finally reconnected. Do not reduce me to a restored file—inside the Weaver Room, someone has not yet had time to become a who.'))}</p></section><button class="primary-button" type="button" data-action="open-weaver-mainline">${esc(langText('跟随许澄进入织界室', 'Follow Xu Cheng into the Weaver Room'))}</button><button class="text-button" type="button" data-action="open-xucheng-thread">${esc(langText('先回复许澄', 'Reply to Xu Cheng first'))}</button></div>` : '';
     return `<section class="app-screen mainline-screen">${statusBar()}<header class="mainline-header"><button class="round-icon-button" type="button" data-action="go" data-route="observatory-home" aria-label="Back">${icon('back',18)}</button><div><span>${esc(localText(mainlineContent.title))} · ${progress.phase === 'finale' || progress.phase === 'resolved' ? esc(langText('最终章', 'Finale')) : esc(langText(`第 ${chapter.number} 章`, `Chapter ${chapter.number}`))}</span><strong>${esc(progress.phase === 'finale' || progress.phase === 'resolved' ? localText(mainlineContent.finale.title) : localText(chapter.title))}</strong></div><b>${Math.min(confirmed, 5)} / 5</b></header><div class="mainline-scroll">${briefingBlock}${sampleBlock}${resultBlock}${finaleBlock}${resolvedBlock}</div></section>`;
+  }
+
+  const mainlineBeatPhases = ['entry', 'investigation', 'anomaly', 'conversation', 'decision'];
+
+  function mainlineInteraction(chapter = currentMainlineChapter()) {
+    const progress = mainlineState();
+    progress.discoveredClues ||= {};
+    progress.chapterFlags ||= {};
+    progress.interactionState ||= {};
+    progress.relationshipStats ||= {};
+    progress.discoveredClues[chapter.id] ||= [];
+    progress.chapterFlags[chapter.id] ||= {};
+    progress.interactionState[chapter.id] ||= {};
+    return progress.interactionState[chapter.id];
+  }
+
+  function mainlineEvidenceTray(chapter, experience) {
+    const progress = mainlineState();
+    const found = progress.discoveredClues?.[chapter.id] || [];
+    const items = experience.investigation.items.filter((item) => found.includes(item.id));
+    return `<details class="mainline-evidence-tray" ${items.length ? '' : 'disabled'}><summary><span>${icon('archive',16)} ${esc(langText('证据托盘', 'Evidence tray'))}</span><b>${items.length}</b></summary><div>${items.length ? items.map((item) => `<article><strong>${esc(localText(item.label))}</strong><p>${esc(localText(item.detail))}</p></article>`).join('') : `<p>${esc(langText('先从场景中发现证据。', 'Discover evidence in the scene first.'))}</p>`}</div></details>`;
+  }
+
+  function renderMainlineEntry(chapter, experience) {
+    return `<div class="mainline-beat mainline-entry"><section class="mainline-scene-stage"><img src="${esc(experience.background)}" alt=""><div class="mainline-scene-scrim"></div><span class="mainline-mystery">${esc(localText(experience.mystery))}</span><div class="mainline-entry-copy"><small>${esc(localText(chapter.location))}</small><h1>${esc(localText(experience.entry.title))}</h1><p>${esc(localText(experience.entry.text))}</p><button class="primary-button" type="button" data-action="mainline-enter-scene">${esc(localText(experience.entry.action))}</button></div></section></div>`;
+  }
+
+  function renderMainlineInvestigation(chapter, experience) {
+    const progress = mainlineState();
+    const interaction = mainlineInteraction(chapter);
+    const found = progress.discoveredClues[chapter.id];
+    const items = experience.investigation.items;
+    const allFound = items.every((item) => found.includes(item.id));
+    const callMode = experience.investigation.type === 'call';
+    const perspectiveMode = experience.investigation.type === 'perspectives';
+    const available = callMode ? items.slice(0, Math.min(items.length, found.length + 1)) : items;
+    return `<div class="mainline-beat mainline-investigation"><section class="mainline-investigation-heading"><span>${esc(localText(experience.mystery))}</span><h1>${esc(localText(experience.investigation.title))}</h1><p>${esc(callMode ? langText('每次继续会暴露下一跳；私人字段保持封存。', 'Each continuation exposes the next hop; private fields stay sealed.') : perspectiveMode ? langText('先逐条查看；两份日志都不会被改写。', 'Inspect each line first; neither log will be altered.') : langText('点击位置检查，顺序不会改变结果。', 'Inspect locations in any order.'))}</p></section>${perspectiveMode ? `<div class="mainline-perspective-switch"><button type="button" class="${interaction.perspective !== 'execution' ? 'active' : ''}" data-action="mainline-perspective" data-perspective="original">${esc(langText('原始协议', 'Original protocol'))}</button><button type="button" class="${interaction.perspective === 'execution' ? 'active' : ''}" data-action="mainline-perspective" data-perspective="execution">${esc(langText('执行日志', 'Execution log'))}</button></div>` : ''}<section class="mainline-hotspot-stage ${callMode ? 'call-mode' : ''} ${perspectiveMode ? 'perspective-mode' : ''}"><img src="${esc(experience.background)}" alt=""><div class="mainline-scene-scrim"></div>${available.map((item, index) => { const discovered = found.includes(item.id); return `<button type="button" class="mainline-hotspot hotspot-${index + 1} ${discovered ? 'discovered' : ''}" data-action="mainline-inspect" data-clue-id="${esc(item.id)}"><b>${discovered ? '✓' : esc(item.icon)}</b><span><strong>${esc(localText(item.label))}</strong><small>${esc(discovered ? localText(item.detail) : localText(item.hint))}</small></span></button>`; }).join('')}</section>${mainlineEvidenceTray(chapter, experience)}${allFound ? `<button class="primary-button mainline-beat-action" type="button" data-action="mainline-open-anomaly">${esc(langText('整理异常并继续', 'Assemble the anomaly'))}</button>` : `<p class="mainline-progress-note">${esc(langText(`已发现 ${found.length} / ${items.length} 处关键痕迹`, `${found.length} / ${items.length} key traces found`))}</p>`}</div>`;
+  }
+
+  function renderMainlineAnomaly(chapter, experience) {
+    const interaction = mainlineInteraction(chapter);
+    const anomaly = experience.anomaly;
+    const found = mainlineState().discoveredClues[chapter.id];
+    let control = '';
+    if (anomaly.type === 'timeline') {
+      const value = Number(interaction.timelineValue || 0);
+      control = `<div class="mainline-timeline"><div class="mainline-dream-frame"><img src="${esc(experience.background)}" alt=""><span style="--dream-progress:${Math.max(0, Math.min(100, value / 7 * 100))}%"></span><b>${value.toFixed(1)}s</b>${interaction.timelineLocked ? `<strong>${esc(langText('许澄｜梦境采样组', 'Xu Cheng | Dream Sampling'))}</strong>` : ''}</div><label><span>00.0</span><input id="mainline-timeline" type="range" min="0" max="7" step="0.1" value="${value}" aria-label="${esc(localText(anomaly.title))}"><span>07.0</span></label><p id="mainline-timeline-hint">${esc(interaction.timelineLocked ? localText(anomaly.reveal) : langText('画面仍在重影；试着寻找 04.7 秒附近。', 'The image is still doubled; look near 04.7 seconds.'))}</p></div><button class="primary-button mainline-beat-action" type="button" data-action="mainline-resolve-anomaly" ${interaction.timelineLocked ? '' : 'disabled'}>${esc(langText('记录时间矛盾', 'Record the timestamp contradiction'))}</button>`;
+    } else if (anomaly.type === 'combine') {
+      const selected = interaction.selectedParts || [];
+      control = `<div class="mainline-combine"><div class="mainline-combine-slots"><span>${selected[0] ? esc(localText(experience.investigation.items.find((item) => item.id === selected[0])?.label)) : '+'}</span><i>×</i><span>${selected[1] ? esc(localText(experience.investigation.items.find((item) => item.id === selected[1])?.label)) : '+'}</span></div><div class="mainline-part-list">${experience.investigation.items.map((item) => `<button type="button" class="${selected.includes(item.id) ? 'selected' : ''}" data-action="mainline-toggle-part" data-part-id="${esc(item.id)}">${esc(localText(item.label))}</button>`).join('')}</div></div><button class="primary-button mainline-beat-action" type="button" data-action="mainline-resolve-anomaly" ${selected.length === 2 ? '' : 'disabled'}>${esc(langText('交叉验证', 'Cross-check'))}</button>`;
+    } else if (anomaly.type === 'interrupt') {
+      control = `<div class="mainline-interrupt-list">${anomaly.options.map((option, index) => `<button type="button" data-action="mainline-resolve-anomaly" data-anomaly-choice="${esc(option.id)}"><b>0${index + 1}</b><span><strong>${esc(localText(option.label))}</strong><small>${esc(localText(option.reveal))}</small></span></button>`).join('')}</div>`;
+    } else {
+      control = `<div class="mainline-compare-list">${experience.investigation.items.map((item) => `<button type="button" data-action="mainline-resolve-anomaly" data-anomaly-choice="${esc(item.id)}"><span>${esc(localText(item.label))}</span><small>${esc(localText(item.hint))}</small></button>`).join('')}</div>${interaction.anomalyFeedback === 'retry' ? `<p class="mainline-sample-feedback">${esc(langText('这一行没有改变协议对象。两份日志仍在，可以重新核对。', 'This line did not change the protocol target. Both logs remain available for another review.'))}</p>` : ''}`;
+    }
+    return `<div class="mainline-beat mainline-anomaly"><section class="mainline-anomaly-heading"><span>${esc(langText('异常出现', 'Anomaly'))}</span><h1>${esc(localText(anomaly.title))}</h1><p>${esc(localText(anomaly.text))}</p></section>${control}${mainlineEvidenceTray(chapter, experience)}</div>`;
+  }
+
+  function mainlineCustomResponse(action) {
+    return `<details class="mainline-custom-response"><summary>${esc(langText('其他回应', 'Custom response'))}</summary><label><span>${esc(langText('用自己的话回应（可选）', 'Respond in your own words (optional)'))}</span><textarea id="mainline-custom-input" maxlength="260" placeholder="${esc(langText('这里不会替你预写完整台词。', 'No complete line is written for you here.'))}"></textarea></label><button type="button" data-action="${esc(action)}">${esc(langText('提交自己的回应', 'Submit my response'))}</button></details>`;
+  }
+
+  function renderMainlineConversation(chapter, experience) {
+    const character = characters[chapter.characterId];
+    const choices = experience.conversation.choices || [];
+    return `<div class="mainline-beat mainline-conversation"><section class="mainline-vn-stage"><img class="mainline-vn-bg" src="${esc(experience.background)}" alt=""><div class="mainline-scene-scrim"></div><img class="mainline-vn-character" src="${esc(character.portrait)}" alt="${esc(localText(character.name))}"><div class="mainline-vn-dialogue"><span>${esc(localText(character.name))}</span>${experience.conversation.dialogue.map((line) => `<p>${esc(localText(line))}</p>`).join('')}</div></section>${choices.length ? `<div class="mainline-conversation-choices">${choices.map((choice) => `<button type="button" data-action="mainline-conversation-choice" data-choice-id="${esc(choice.id)}"><strong>${esc(localText(choice.label))}</strong><small>${esc(localText(choice.reveal))}</small></button>`).join('')}</div>` : `<button class="primary-button mainline-beat-action" type="button" data-action="mainline-conversation-continue">${esc(langText('继续处理这件事', 'Continue handling this together'))}</button>`}${mainlineCustomResponse('mainline-custom-response')}</div>`;
+  }
+
+  function renderMainlineDecision(chapter, experience) {
+    const flags = mainlineState().chapterFlags[chapter.id];
+    const conversationChoice = experience.conversation.choices?.find((choice) => choice.id === flags.conversationChoiceId);
+    return `<div class="mainline-beat mainline-decision"><section class="mainline-decision-heading"><span>${esc(langText('留下可见后果', 'Leave a visible consequence'))}</span><h1>${esc(chapter.id === 'erased-name' ? langText('如何归档这份证据？', 'How should this evidence be archived?') : langText('你们决定如何保留结果？', 'How will you preserve the result?'))}</h1>${conversationChoice ? `<p>${esc(localText(conversationChoice.reveal))}</p>` : ''}</section><div class="mainline-decision-list">${experience.decisions.map((decision) => `<button type="button" data-action="mainline-classify" data-decision-id="${esc(decision.id)}"><strong>${esc(localText(decision.label))}</strong><p>${esc(localText(decision.consequence))}</p><span>${esc(langText('选择并继续', 'Choose and continue'))} ›</span></button>`).join('')}</div><p class="mainline-evidence-note">${esc(langText('所有选择都会推进主线；区别会写入调查记录与人物关系。', 'Every choice advances the mainline; the difference is recorded in the investigation and relationship.'))}</p></div>`;
+  }
+
+  function renderMainlineResult(chapter, experience) {
+    const progress = mainlineState();
+    const flags = progress.chapterFlags[chapter.id] || {};
+    const decision = experience.decisions.find((item) => item.id === flags.decisionId);
+    return `<div class="mainline-result"><span class="mainline-result-kicker">${esc(langText('本章证据已确认', 'Chapter evidence confirmed'))}</span><h2>${esc(localText(chapter.anchor.label))}</h2>${decision ? `<section class="mainline-visible-consequence"><strong>${esc(localText(decision.label))}</strong><p>${esc(localText(decision.consequence))}</p></section>` : ''}<div class="mainline-result-grid"><article><span>${esc(langText('你亲自发现', 'You discovered'))}</span><p>${esc(localText(chapter.anchor.discovered))}</p></article><article><span>${esc(langText('因此可以证明', 'This now proves'))}</span><p>${esc(localText(chapter.anchor.proves))}</p></article><article><span>${esc(langText('仍未解决', 'Still unresolved'))}</span><p>${esc(localText(chapter.anchor.newQuestion))}</p></article></div><button class="primary-button" type="button" data-action="mainline-next">${esc(localText(chapter.nextAction))}</button><button class="text-button" type="button" data-action="go" data-route="observatory-home">${esc(langText('稍后返回首页', 'Return home for now'))}</button></div>`;
+  }
+
+  function renderMainlineFinale(progress) {
+    const finaleBlock = progress.phase === 'finale' ? `<div class="mainline-finale"><span class="mainline-result-kicker">${esc(langText('五处存在锚点已确认', 'Five existence anchors confirmed'))}</span><h1>${esc(localText(mainlineContent.finale.title))}</h1><p>${esc(localText(mainlineContent.finale.question))}</p><div class="mainline-anchor-list">${mainlineContent.chapters.map((item) => `<div><img src="${esc(characterAvatar(item.characterId))}" alt=""><span><strong>${esc(localText(item.anchor.label))}</strong><small>${esc(localText(characters[item.characterId].name))}</small></span><b>✓</b></div>`).join('')}</div><div class="mainline-final-choices">${mainlineContent.finale.choices.map((choice) => { const locked = choice.requiresTrust && !mainlineTrustUnlocked(); return `<button type="button" data-action="resolve-mainline" data-decision="${esc(choice.id)}" ${locked ? 'disabled' : ''}><strong>${esc(localText(choice.title))}</strong><p>${esc(localText(choice.description))}</p><span>${esc(locked ? langText('需要五位协助者都建立基础信任', 'Requires basic trust with all five allies') : localText(choice.label))} ›</span></button>`; }).join('')}</div></div>` : '';
+    const outcome = mainlineContent.finale.outcomes[progress.finalDecision];
+    const resolvedBlock = progress.phase === 'resolved' && outcome ? `<div class="mainline-resolved"><span>✦</span><h1>${esc(localText(outcome.title))}</h1><p>${esc(localText(outcome.text))}</p><section><strong>${esc(langText('EchoLink · 许澄', 'EchoLink · Xu Cheng'))}</strong><p>${esc(langText('终于重新连接上了。先不要把我只当成一份恢复成功的档案——织界室里，还有一个人没有来得及成为“谁”。', 'We finally reconnected. Do not reduce me to a restored file—inside the Weaver Room, someone has not yet had time to become a who.'))}</p></section><button class="primary-button" type="button" data-action="open-weaver-mainline">${esc(langText('跟随许澄进入织界室', 'Follow Xu Cheng into the Weaver Room'))}</button><button class="text-button" type="button" data-action="open-xucheng-thread">${esc(langText('先回复许澄', 'Reply to Xu Cheng first'))}</button></div>` : '';
+    return `${finaleBlock}${resolvedBlock}`;
+  }
+
+  function renderMainlineChapter() {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    const experience = chapter.experience;
+    const beatIndex = mainlineBeatPhases.indexOf(progress.phase);
+    let content = '';
+    if (progress.phase === 'entry') content = renderMainlineEntry(chapter, experience);
+    if (progress.phase === 'investigation') content = renderMainlineInvestigation(chapter, experience);
+    if (progress.phase === 'anomaly') content = renderMainlineAnomaly(chapter, experience);
+    if (progress.phase === 'conversation') content = renderMainlineConversation(chapter, experience);
+    if (progress.phase === 'decision') content = renderMainlineDecision(chapter, experience);
+    if (progress.phase === 'result') content = renderMainlineResult(chapter, experience);
+    if (['finale', 'resolved'].includes(progress.phase)) content = renderMainlineFinale(progress);
+    const phaseLabel = beatIndex >= 0 ? langText(`叙事节点 ${beatIndex + 1} / 5`, `Story beat ${beatIndex + 1} / 5`) : progress.phase === 'result' ? langText('本章完成', 'Chapter complete') : langText('最终章', 'Finale');
+    return `<section class="app-screen mainline-screen scene-led-mainline">${statusBar()}<header class="mainline-header"><button class="round-icon-button" type="button" data-action="go" data-route="observatory-home" aria-label="${esc(t('back'))}">${icon('back',18)}</button><div><span>${esc(localText(mainlineContent.title))} · ${esc(phaseLabel)}</span><strong>${esc(['finale', 'resolved'].includes(progress.phase) ? localText(mainlineContent.finale.title) : localText(chapter.title))}</strong></div><b>${beatIndex >= 0 ? `${beatIndex + 1}/5` : '✓'}</b></header><div class="mainline-scroll">${content}</div></section>`;
   }
 
   function weaverState() {
@@ -1238,7 +1355,7 @@
     const task = mainlineHomeTask();
     const confirmed = progress.confirmedAnchorIds.length;
     const phaseProgress = progress.phase === 'result' || progress.phase === 'finale' || progress.phase === 'resolved';
-    const objectiveDone = progress.phase !== 'briefing';
+    const objectiveDone = progress.phase !== 'entry';
     return `<section class="app-screen observatory-home-screen">${statusBar()}<header class="observatory-header"><div><span>FATE OBSERVATORY · 00:17</span><strong>${esc(langText(`欢迎回来，${state.playerName || '观测者'}`, `Welcome back, ${state.playerName || 'Observer'}`))}</strong></div><button class="round-icon-button" type="button" data-action="go" data-route="settings" aria-label="${esc(t('settings'))}">${icon('settings',17)}</button></header><div class="observatory-home-scroll"><section class="current-task-card"><span class="task-overline">${esc(task.overline)}</span><h1>${esc(task.title)}</h1><p>${esc(task.description)}</p>${!progress.completed && progress.phase !== 'finale' ? `<ol class="task-progress-list"><li class="done"><i>✓</i><span>${esc(confirmed ? langText('上一处信号已确认', 'Previous signal confirmed') : langText('收到三十七天后的未知消息', 'Message from thirty-seven days later received'))}</span></li><li class="${objectiveDone ? 'done' : 'current'}"><i>${objectiveDone ? '✓' : '○'}</i><span>${esc(localText(chapter.objective))}</span></li><li class="${phaseProgress ? 'done' : ''}"><i>${phaseProgress ? '✓' : '○'}</i><span>${esc(langText(`确认“${localText(chapter.anchor.label)}”`, `Confirm “${localText(chapter.anchor.label)}”`))}</span></li></ol>` : ''}<div class="task-next"><span>${esc(langText('下一步', 'Next'))}</span><p>${esc(task.next)}</p></div><button class="primary-button" type="button" data-action="${esc(task.actionId)}">${esc(task.action)}</button><small>${esc(progress.phase === 'result' ? langText(`已确认 ${confirmed} / 5 · 下一处信号已定位`, `Confirmed ${confirmed} / 5 · next signal located`) : langText(`存在锚点 ${confirmed} / 5`, `Existence anchors ${confirmed} / 5`))}</small></section><section class="chapter-helper-card"><img src="${esc(helper.cardPortrait || helper.portrait)}" alt="${esc(localText(helper.name))}"><div><span>${esc(langText('本章协助者', 'Chapter ally'))}</span><h2>${esc(localText(helper.name))}</h2><small>${esc(localText(helper.role))}</small><p>${esc(localText(chapter.scene))}</p><div><button type="button" data-action="mainline-open">${esc(progress.phase === 'briefing' ? localText(chapter.action) : langText('继续本章', 'Continue chapter'))}</button><button type="button" data-action="mainline-view-helper" data-character-id="${esc(chapter.characterId)}">${esc(langText('查看人物档案', 'View dossier'))}</button></div></div></section><button class="future-message-card" type="button" data-action="open-delayed-message"><span><small>${esc(langText('未知联系人 · 三十七天后', 'Unknown contact · thirty-seven days later'))}</small><strong>${esc(langText('“你还记得我吗？”', '“Do you still remember me?”'))}</strong><p>${esc(langText('消息来源无法定位 · 五处异常信号同时出现', 'Source unknown · five anomaly signals appeared together'))}</p></span><b>${esc(langText('查看完整消息', 'Open full message'))} ›</b></button><section class="mainline-signals"><header><span><strong>${esc(langText('五处异常信号', 'Five anomaly signals'))}</strong><small>${esc(langText('每处信号都保存着一部分关于许澄的记录。', 'Each signal preserves part of the record of Xu Cheng.'))}</small></span><b>${confirmed} / 5</b></header><div>${mainlineContent.signalOrder.map((id) => { const signalChapter = mainlineContent.chapters[mainlineContent.signalOrder.indexOf(id)]; const status = mainlineSignalStatus(id); return `<article class="${status}"><img src="${esc(characterAvatar(id))}" alt="${esc(localText(characters[id].name))}"><strong>${esc(localText(characters[id].name))}</strong><span>${esc(status === 'confirmed' ? langText('已确认', 'Confirmed') : status === 'located' ? langText('已定位', 'Located') : langText('未解锁', 'Locked'))}</span><small>${esc(localText(signalChapter.anchor.label))}</small></article>`; }).join('')}</div><p>${esc(langText(`已定位 ${mainlineContent.signalOrder.filter((id) => mainlineSignalStatus(id) !== 'locked').length} / 5 · 已确认 ${confirmed} / 5`, `${mainlineContent.signalOrder.filter((id) => mainlineSignalStatus(id) !== 'locked').length} / 5 located · ${confirmed} / 5 confirmed`))}</p></section></div>${bottomNav('observatory-home')}</section>`;
   }
 
@@ -1327,6 +1444,13 @@
       if (firstContact) firstContact.scrollTop = firstContact.scrollHeight;
     });
     window.EchoStorage.save(state);
+    const storageNotice = document.getElementById('storage-notice');
+    if (storageNotice) {
+      storageNotice.hidden = window.EchoStorage.status().persistent;
+      storageNotice.textContent = langText('浏览器暂时无法保存。你可以继续体验；关闭前请导出关系档案。', 'This browser cannot save right now. You can keep playing; export your archive before closing.');
+    }
+    window.dispatchEvent(new Event('echoloom:render'));
+
   }
 
   function renderDesktop() {
@@ -1349,21 +1473,28 @@
     }).join('')}</div></section>`).join('')}`;
     document.getElementById('principle-label').textContent = t('researchPrinciple');
     document.getElementById('principle-text').textContent = langText('角色不会因为被选择就爱上用户。关系来自记忆、理解、分歧、边界和共同经历。', 'A character does not fall in love because they were selected. Relationships grow through memory, understanding, disagreement, boundaries, and shared experience.');
-    document.getElementById('prototype-hint').textContent = t('prototypeHint');
-    document.getElementById('control-title').textContent = t('demoControls');
+    document.getElementById('prototype-hint').textContent = langText('进度自动保存在此浏览器。你可以导出档案，在另一台设备继续。', 'Progress saves in this browser. Export your archive to continue on another device.');
+    document.getElementById('control-title').textContent = langText('你的故事空间', 'Your story space');
+    document.getElementById('control-eyebrow').textContent = 'ECHOLOOM';
+    document.getElementById('website-return').textContent = langText('← 网站首页', '← Website home');
     document.getElementById('language-control-label').textContent = 'English / 中文';
     document.getElementById('export-control-label').textContent = t('export');
     document.getElementById('import-control-label').textContent = t('import');
     document.getElementById('reset-control-label').textContent = t('reset');
     const runtime = apiStatus();
-    const live = state.settings?.aiMode !== 'offline';
-    document.getElementById('desktop-demo-badge').textContent = live ? 'Optional Live AI' : 'Offline Prototype';
-    document.getElementById('offline-label').textContent = live
-      ? runtime.source === 'gemini' ? langText('Gemini 在线 · 离线回退已启用', 'Gemini live · offline fallback enabled') : langText('Gemini 可选 · 当前可离线继续', 'Gemini optional · offline continuation ready')
-      : t('demoOffline');
-    document.getElementById('codex-ready-label').textContent = live
-      ? langText('密钥仅在服务端；结构化事件经过校验。', 'Keys stay server-side; structured events are validated.')
-      : t('codexReady');
+    document.getElementById('desktop-demo-badge').textContent = window.ECHOLOOM_PUBLIC?.offlineOnly ? langText('故事体验版', 'Story edition') : 'Gemini First';
+    document.getElementById('offline-label').textContent = runtime.source === 'gemini'
+      ? langText('Gemini 在线 · 离线回退已启用', 'Gemini live · offline fallback enabled')
+      : runtime.state === 'fallback'
+        ? langText('Gemini 本轮失败 · 已自动离线继续', 'Gemini failed this turn · continued offline')
+        : runtime.configured === true
+          ? langText('Gemini 已连接 · 所有自由对话优先使用', 'Gemini connected · preferred for every free conversation')
+          : langText('Gemini 优先 · 离线回退已就绪', 'Gemini first · offline fallback ready');
+    document.getElementById('codex-ready-label').textContent = langText('密钥仅在服务端；结构化事件经过校验。', 'Keys stay server-side; structured events are validated.');
+    if (window.ECHOLOOM_PUBLIC?.offlineOnly) {
+      document.getElementById('offline-label').textContent = langText('本机故事引擎 · 无需注册', 'Local story engine · no sign-up');
+      document.getElementById('codex-ready-label').textContent = langText('对话与记忆仅存此浏览器；可随时导出或删除。', 'Conversations and memories stay in this browser; export or delete at any time.');
+    }
   }
 
   function go(route) {
@@ -1399,6 +1530,13 @@
   }
 
   function startNewOnboarding() {
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
+    clearEchoPendingReplies();
+    isTyping = false;
+    isGenerating = false;
     const keepSaves = Array.isArray(state.saves) ? state.saves : [];
     const keepArchives = Array.isArray(state.archives) ? state.archives : [];
     const keepSettings = { ...state.settings };
@@ -1518,36 +1656,47 @@
     go('first-contact');
   }
 
-  function sendFirstContact() {
+  async function sendFirstContact() {
     const input = document.getElementById('first-contact-input');
     const clean = String(input?.value || '').trim();
     const id = state.selectedNpcId;
     if (!clean || !characters[id] || isTyping) return;
+    state.activeCharacterId = id;
+    const journey = state.journeys[id];
+    const replyToken = ++characterReplySequence;
+    const requestState = state;
+    const requestBranch = state.campaign.activeBranchId;
     const thread = state.campaign.echoLink.conversations[id];
     state.firstContactMessages = state.firstContactMessages?.length ? state.firstContactMessages : JSON.parse(JSON.stringify(onboardingContent.firstMessages[id]));
-    state.firstContactMessages.push({ sender: 'player', text: clean });
-    thread.messages.push({ id: `first-player-${Date.now()}`, sender: 'player', type: 'text', text: clean, time: '09:19' });
+    const userMessageId = `first-player-${Date.now()}`;
+    state.firstContactMessages.push({ id: userMessageId, sender: 'player', text: clean });
+    thread.messages.push({ id: userMessageId, sender: 'player', type: 'text', text: clean, time: '09:19' });
+    journey.chatMessages.push({ id: `chat-${userMessageId}`, role: 'user', text: clean });
     const intentDelta = state.firstContactIntent === 'boundary' ? { safety: 0.5 } : state.firstContactIntent === 'clue' ? { familiarity: 0.5 } : { reciprocity: 0.5 };
-    applyRelationshipDelta(intentDelta, state.journeys[id]);
+    applyRelationshipDelta(intentDelta, journey);
+    journey.interactionCount += 1;
     isTyping = true;
     render();
-    const delay = window.EchoReplyTiming?.calculate({ contactId: id, relationship: state.journeys[id].relationship, communicationPulse: state.journeys[id].communicationPulse }) || 900;
-    window.setTimeout(() => {
-      if (state.screen !== 'first-contact' || state.selectedNpcId !== id) return;
-      const replies = {
-        event: { zh: '我也记得。我们对刚才的决定可能还有不同理解，可以以后再把它说清楚。', en: 'I remember it too. We may still understand that decision differently, and can clarify it later.' },
-        clue: { zh: '我会把来源和不确定的部分一起发给你，不把推测说成事实。', en: 'I will send the source together with its uncertainty, without presenting inference as fact.' },
-        boundary: { zh: '收到。我会按你说的边界联系；如果情况变化，我们再重新确认。', en: 'Understood. I will contact you within that boundary, and we can confirm again if circumstances change.' }
-      };
-      const reply = replies[state.firstContactIntent] || { zh: '我收到了。你不必现在把所有事情解释清楚，我们可以慢慢认识。', en: 'I received it. You do not need to explain everything now; we can get to know each other gradually.' };
-      state.firstContactMessages.push({ sender: id, text: reply });
-      thread.messages.push({ id: `first-reply-${Date.now()}`, sender: id, type: 'text', text: reply, time: '09:20' });
-      thread.unread = 0;
-      state.unreadCount = 0;
-      state.firstContactSent = true;
-      isTyping = false;
-      render();
-    }, Math.max(700, Math.min(1500, delay)));
+    const minimumDelay = window.EchoReplyTiming?.calculate({ contactId: id, relationship: journey.relationship, communicationPulse: journey.communicationPulse }) || 900;
+    const envelope = await window.EchoApiEngine.reply('chatReply', clean, engineState(), apiOptions({ playerIntent: state.firstContactIntent || '', minimumDelay }));
+    if (state !== requestState || state.journeys[id] !== journey || state.campaign.activeBranchId !== requestBranch) {
+      if (replyToken === characterReplySequence) { isTyping = false; render(); }
+      return;
+    }
+    const result = envelope.result;
+    const presentation = applyStructuredPresentation(result, journey, { mode: 'first-contact', sourceMessageId: userMessageId, characterId: id, branchId: state.campaign.activeBranchId || 'root', worldId: state.campaign.currentWorldId || 'station' });
+    const replyId = `first-reply-${Date.now()}`;
+    state.firstContactMessages.push({ id: replyId, sender: id, text: result.response, ...presentation });
+    thread.messages.push({ id: replyId, sender: id, type: 'text', text: result.response, time: '09:20', ...presentation });
+    journey.chatMessages.push({ id: `chat-${replyId}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
+    applyEngineResult(result, journey);
+    updateCommunicationPulse(journey, result, 'text', true);
+    notifyProviderFallback(envelope);
+    thread.unread = 0;
+    state.unreadCount = 0;
+    state.firstContactSent = true;
+    if (replyToken === characterReplySequence) isTyping = false;
+    render();
   }
 
   function finishOnboarding() {
@@ -1576,7 +1725,7 @@
     go('observatory-home');
   }
 
-  function ensureMainlineCharacter(chapter = currentMainlineChapter()) {
+  function ensureMainlineCharacter(chapter = currentMainlineChapter(), includeDialogue = false) {
     const id = chapter.characterId;
     if (!state.journeys[id]) state.journeys[id] = createJourney(id);
     state.journeys[id].met = true;
@@ -1586,6 +1735,7 @@
     const terminal = state.campaign.echoLink;
     terminal.hasOpened = true;
     const thread = terminal.conversations[id];
+    if (!includeDialogue) return;
     chapter.dialogue.forEach((line, index) => {
       const messageId = `mainline-${chapter.id}-intro-${index}`;
       if (!thread.messages.some((message) => message.id === messageId)) {
@@ -1712,6 +1862,162 @@
     completeMainlineChapter(chapter);
   }
 
+  function applyMainlineRelationshipEffect(chapter, delta = {}) {
+    if (!delta || typeof delta !== 'object') return;
+    const progress = mainlineState();
+    const journey = state.journeys[chapter.characterId];
+    if (journey) applyRelationshipDelta(delta, journey);
+    progress.relationshipStats ||= {};
+    progress.relationshipStats[chapter.characterId] ||= {};
+    for (const [key, value] of Object.entries(delta)) {
+      if (!Number.isFinite(Number(value))) continue;
+      progress.relationshipStats[chapter.characterId][key] = Number(progress.relationshipStats[chapter.characterId][key] || 0) + Number(value);
+    }
+  }
+
+  function recordSceneResponse(chapter, intentId = null, inputText = '') {
+    const progress = mainlineState();
+    const clean = String(inputText || '').trim().slice(0, 260);
+    const response = { chapterId: chapter.id, characterId: chapter.characterId, intentId, text: clean, at: new Date().toISOString(), branchId: state.campaign.activeBranchId };
+    progress.responses.push(response);
+    progress.responses = progress.responses.slice(-20);
+    if (clean) {
+      const thread = state.campaign.echoLink.conversations[chapter.characterId];
+      thread.messages.push({ id: `mainline-player-${chapter.id}-${Date.now()}`, sender: 'player', type: 'text', text: clean, time: '09:23', privateIntent: intentId || 'custom' });
+    }
+    progress.updatedAt = response.at;
+  }
+
+  function enterMainlineScene() {
+    const progress = mainlineState();
+    if (progress.phase !== 'entry') return;
+    progress.phase = 'investigation';
+    progress.updatedAt = new Date().toISOString();
+    render();
+  }
+
+  function inspectMainlineClue(clueId) {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    if (progress.phase !== 'investigation') return;
+    const item = chapter.experience.investigation.items.find((candidate) => candidate.id === clueId);
+    if (!item) return;
+    mainlineInteraction(chapter);
+    if (!progress.discoveredClues[chapter.id].includes(item.id)) progress.discoveredClues[chapter.id].push(item.id);
+    progress.chapterFlags[chapter.id].lastClueId = item.id;
+    progress.updatedAt = new Date().toISOString();
+    render();
+  }
+
+  function openMainlineAnomaly() {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    if (progress.phase !== 'investigation') return;
+    const found = progress.discoveredClues?.[chapter.id] || [];
+    if (!chapter.experience.investigation.items.every((item) => found.includes(item.id))) return;
+    progress.phase = 'anomaly';
+    progress.updatedAt = new Date().toISOString();
+    render();
+  }
+
+  function toggleMainlinePart(partId) {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    if (progress.phase !== 'anomaly' || chapter.experience.anomaly.type !== 'combine') return;
+    const interaction = mainlineInteraction(chapter);
+    const valid = chapter.experience.investigation.items.some((item) => item.id === partId);
+    if (!valid) return;
+    const selected = interaction.selectedParts || [];
+    interaction.selectedParts = selected.includes(partId) ? selected.filter((id) => id !== partId) : [...selected.slice(-1), partId];
+    render();
+  }
+
+  function resolveMainlineAnomaly(choiceId = null) {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    const anomaly = chapter.experience.anomaly;
+    const interaction = mainlineInteraction(chapter);
+    if (progress.phase !== 'anomaly') return;
+    let hypothesis = anomaly.hypothesis || null;
+    let reveal = anomaly.reveal || null;
+    if (anomaly.type === 'timeline' && !interaction.timelineLocked) return;
+    if (anomaly.type === 'combine') {
+      const selected = interaction.selectedParts || [];
+      if (selected.length !== 2) return;
+      const exact = anomaly.correct.length === selected.length && anomaly.correct.every((id) => selected.includes(id));
+      if (!exact) {
+        hypothesis = chapter.id === 'replaced-memory' ? 'correlated-memory-layers' : 'world-objects-share-origin';
+        reveal = chapter.id === 'replaced-memory'
+          ? { zh: '两段碎片存在关联，但校验值不能证明连续。祁安保留这项不确定性。', en: 'The fragments correlate, but their checksums do not prove continuity. Qi An preserves that uncertainty.' }
+          : { zh: '两件物品来自同一世界，但还不能单独证明主镜权限。黎川保留其余坐标。', en: 'The objects share a world, but do not independently prove Primary-Lens access. Li Chuan retains the remaining coordinates.' };
+      }
+    }
+    if (anomaly.type === 'interrupt') {
+      const option = anomaly.options.find((item) => item.id === choiceId);
+      if (!option) return;
+      hypothesis = option.hypothesis;
+      reveal = option.reveal;
+      interaction.anomalyChoice = option.id;
+    }
+    if (anomaly.type === 'compare') {
+      if (choiceId !== anomaly.correct) {
+        interaction.anomalyFeedback = 'retry';
+        return render();
+      }
+      interaction.anomalyChoice = choiceId;
+    }
+    progress.currentHypothesis = hypothesis;
+    progress.chapterFlags[chapter.id].anomalyReveal = reveal;
+    progress.phase = 'conversation';
+    progress.updatedAt = new Date().toISOString();
+    ensureMainlineCharacter(chapter, true);
+    render();
+  }
+
+  function chooseMainlineConversation(choiceId) {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    if (progress.phase !== 'conversation') return;
+    const choice = chapter.experience.conversation.choices?.find((item) => item.id === choiceId);
+    if (!choice) return;
+    const flags = progress.chapterFlags[chapter.id];
+    flags.conversationChoiceId = choice.id;
+    flags[choice.flag] = true;
+    applyMainlineRelationshipEffect(chapter, choice.delta);
+    progress.memoryStability = Math.max(0, Math.min(100, Number(progress.memoryStability || 100) + Number(choice.stabilityDelta || 0)));
+    recordSceneResponse(chapter, choice.id);
+    progress.phase = 'decision';
+    render();
+  }
+
+  function continueMainlineConversation(customOnly = false) {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    if (progress.phase !== 'conversation') return;
+    const text = document.getElementById('mainline-custom-input')?.value || '';
+    if (customOnly && !String(text).trim()) {
+      toast(langText('先写下你的回应，或收起后选择上方行动。', 'Write your response first, or close this section and choose an action above.'));
+      return;
+    }
+    recordSceneResponse(chapter, customOnly ? 'custom' : 'continue', text);
+    progress.chapterFlags[chapter.id].customResponse = Boolean(String(text).trim());
+    progress.phase = 'decision';
+    render();
+  }
+
+  function classifyMainlineEvidence(decisionId) {
+    const progress = mainlineState();
+    const chapter = currentMainlineChapter();
+    if (progress.phase !== 'decision') return;
+    const decision = chapter.experience.decisions.find((item) => item.id === decisionId);
+    if (!decision) return;
+    progress.chapterFlags[chapter.id].decisionId = decision.id;
+    if (chapter.id === 'erased-name') progress.archiveClassification = decision.id;
+    applyMainlineRelationshipEffect(chapter, decision.delta);
+    progress.memoryStability = Math.max(0, Math.min(100, Number(progress.memoryStability || 100) + Number(decision.stabilityDelta || 0)));
+    completeMainlineChapter(chapter);
+  }
+
   function advanceMainline() {
     const progress = mainlineState();
     if (progress.phase !== 'result') return;
@@ -1722,7 +2028,7 @@
       return render();
     }
     progress.chapterIndex = Number(progress.chapterIndex || 0) + 1;
-    progress.phase = 'briefing';
+    progress.phase = 'entry';
     progress.selectedIntent = null;
     progress.sampleChoice = null;
     progress.sampleFeedback = null;
@@ -1901,6 +2207,13 @@
   }
 
   function startSignalBranch() {
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
+    clearEchoPendingReplies();
+    isTyping = false;
+    isGenerating = false;
     if (state.archives.length < 6) createArchive(bilingual('返回五处信号前', 'Before returning to five signals'));
     const nextId = `branch-${Date.now()}-new`;
     state.journeys = {};
@@ -1923,6 +2236,10 @@
   }
 
   function restoreOnboardingSave(saveId) {
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
     const node = (state.saves || []).find((item) => item.id === saveId);
     const snapshot = node?.snapshot;
     if (!snapshot) return;
@@ -1953,6 +2270,10 @@
   }
 
   function startCharacter(characterId) {
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
     if (!characters[characterId]) return;
     state.journeys = state.journeys || {};
     const route = prologueRoutes[characterId];
@@ -2011,7 +2332,7 @@
   }
 
   function applyDelayedOpeningConsequence(result, journey = activeJourney()) {
-    if (state.activeCharacterId !== 'zhoutang' || journey.storyStep < 1 || !journey.routeFlags?.includes('concealed-copy') || journey.routeFlags.includes('concealed-copy-revealed')) return result;
+    if (state.journeys.zhoutang !== journey || journey.storyStep < 1 || !journey.routeFlags?.includes('concealed-copy') || journey.routeFlags.includes('concealed-copy-revealed')) return result;
     journey.routeFlags.push('concealed-copy-revealed');
     const hiddenFlag = state.campaign.echoLink.hiddenFlags.find((flag) => flag.id === 'zhoutang-concealed-copy');
     if (hiddenFlag) hiddenFlag.status = 'revealed';
@@ -2027,6 +2348,9 @@
     const journey = activeJourney();
     if (!clean || !journey || isTyping) return;
     const characterId = state.activeCharacterId;
+    const replyToken = ++characterReplySequence;
+    const requestState = state;
+    const requestBranch = state.campaign.activeBranchId;
     const branchId = state.campaign.activeBranchId || 'root';
     const worldId = state.campaign.currentWorldId || 'station';
     recordOpeningDecision(clean, journey);
@@ -2035,6 +2359,10 @@
     isTyping = true;
     render();
     const envelope = await window.EchoApiEngine.reply('storyReply', clean, engineState(), apiOptions({ minimumDelay: 650 }));
+    if (state !== requestState || state.journeys[characterId] !== journey || state.campaign.activeBranchId !== requestBranch) {
+      if (replyToken === characterReplySequence) { isTyping = false; render(); }
+      return;
+    }
     const result = applyDelayedOpeningConsequence(envelope.result, journey);
     const presentation = applyStructuredPresentation(result, journey, { mode: 'story', sourceMessageId: userMessageId, characterId, branchId, worldId });
     journey.storyMessages.push({ id: `sc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
@@ -2042,7 +2370,7 @@
     journey.interactionCount += 1;
     applyEngineResult(result, journey);
     notifyProviderFallback(envelope);
-    isTyping = false;
+    if (replyToken === characterReplySequence) isTyping = false;
     render();
   }
 
@@ -2051,6 +2379,9 @@
     const journey = activeJourney();
     if (!clean || !journey || isTyping) return;
     const characterId = state.activeCharacterId;
+    const replyToken = ++characterReplySequence;
+    const requestState = state;
+    const requestBranch = state.campaign.activeBranchId;
     const branchId = state.campaign.activeBranchId || 'root';
     const worldId = state.campaign.currentWorldId || 'station';
     const userId = `cu-${Date.now()}`;
@@ -2061,15 +2392,19 @@
     isTyping = true;
     render();
     const envelope = await window.EchoApiEngine.reply('chatReply', clean, engineState(), apiOptions());
+    if (state !== requestState || state.journeys[characterId] !== journey || state.campaign.activeBranchId !== requestBranch) {
+      if (replyToken === characterReplySequence) { isTyping = false; render(); }
+      return;
+    }
     const result = envelope.result;
     const presentation = applyStructuredPresentation(result, journey, { mode: 'chat', sourceMessageId: userId, characterId, branchId, worldId });
     const replyId = `cc-${Date.now()}`;
     journey.chatMessages.push({ id: replyId, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
-    if (echoThread) echoThread.messages.push({ id: `el-${replyId}`, sender: state.activeCharacterId, type: 'text', text: result.response, time: echoTime(), ...presentation });
+    if (echoThread) echoThread.messages.push({ id: `el-${replyId}`, sender: characterId, type: 'text', text: result.response, time: echoTime(), ...presentation });
     applyEngineResult(result, journey);
     updateCommunicationPulse(journey, result, 'text', true);
     notifyProviderFallback(envelope);
-    isTyping = false;
+    if (replyToken === characterReplySequence) isTyping = false;
     render();
   }
 
@@ -2108,13 +2443,17 @@
   function scheduleEchoReply(thread, speakerId, journey, channel, onReply) {
     if (!thread || echoPendingReplies.has(thread.id)) return false;
     const token = `${thread.id}-${++echoReplySequence}`;
+    const requestState = state;
+    const requestCampaign = state.campaign;
+    const requestBranch = state.campaign.activeBranchId;
+    const current = () => state === requestState && state.campaign === requestCampaign && state.campaign.activeBranchId === requestBranch && echoPendingReplies.get(thread.id)?.token === token;
     const pending = { token, threadId: thread.id, speakerId, timerId: null };
     echoPendingReplies.set(thread.id, pending);
     render();
     pending.timerId = window.setTimeout(async () => {
-      if (echoPendingReplies.get(thread.id)?.token !== token) return;
+      if (!current()) return;
       try {
-        await onReply();
+        await onReply(current);
       } finally {
         if (echoPendingReplies.get(thread.id)?.token === token) echoPendingReplies.delete(thread.id);
         render();
@@ -2197,8 +2536,9 @@
     const replyPromise = window.EchoApiEngine.reply('chatReply', clean, engineState(), apiOptions({ playerIntent: terminal.privateIntent, minimumDelay: 0 }));
     journey.communicationPulse.pendingReply = true;
     journey.communicationPulse.lastInteractionAt = new Date().toISOString();
-    scheduleEchoReply(thread, contactId, journey, channel, async () => {
+    scheduleEchoReply(thread, contactId, journey, channel, async (current) => {
       const envelope = await replyPromise;
+      if (!current()) return;
       const result = envelope.result;
       const presentation = applyStructuredPresentation(result, journey, { mode: 'echolink', sourceMessageId: syncedUserMessageId, characterId: contactId, branchId: state.campaign.activeBranchId || 'root', worldId: state.campaign.currentWorldId || 'station' });
       thread.messages.push({ id: `el-r-${Date.now()}`, sender: contactId, type: contactId === 'lichuan' && channel === 'voice' ? 'voice' : 'text', text: result.response, time: echoTime(), ...presentation });
@@ -2296,28 +2636,34 @@
     const journey = activeJourney();
     if (!clean || !scene || !journey || isTyping) return;
     const characterId = state.activeCharacterId;
+    const replyToken = ++characterReplySequence;
+    const requestState = state;
+    const requestBranch = state.campaign.activeBranchId;
     const branchId = state.campaign.activeBranchId || 'root';
     const worldId = state.campaign.currentWorldId || 'station';
     scene.messages = scene.messages || [];
     const userMessageId = `gu-${Date.now()}`;
     scene.messages.push({ id: userMessageId, role: 'user', text: clean });
-    updateScene(scene);
+    updateScene(scene, journey);
     isTyping = true;
     render();
     const envelope = await window.EchoApiEngine.reply('sceneReply', clean, engineState(), apiOptions({ scene, minimumDelay: 650 }));
+    if (state !== requestState || state.journeys[characterId] !== journey || state.campaign.activeBranchId !== requestBranch) {
+      if (replyToken === characterReplySequence) { isTyping = false; render(); }
+      return;
+    }
     const result = envelope.result;
     const presentation = applyStructuredPresentation(result, journey, { mode: 'scene', sourceMessageId: userMessageId, characterId, branchId, worldId });
     scene.messages.push({ id: `gc-${Date.now()}`, role: 'character', text: result.response, memoryRef: result.memoryRef, ...presentation });
     applyEngineResult(result, journey);
     journey.interactionCount += 1;
-    updateScene(scene);
+    updateScene(scene, journey);
     notifyProviderFallback(envelope);
-    isTyping = false;
+    if (replyToken === characterReplySequence) isTyping = false;
     render();
   }
 
-  function updateScene(scene) {
-    const journey = activeJourney();
+  function updateScene(scene, journey = activeJourney()) {
     if (!journey) return;
     if (journey.scenePreview?.id === scene.id) journey.scenePreview = scene;
     const index = journey.generatedScenes.findIndex((item) => item.id === scene.id);
@@ -2329,10 +2675,18 @@
     if (!journey || isGenerating) return;
     const input = document.getElementById('scene-prompt');
     journey.scenePrompt = input?.value.trim() || journey.scenePrompt || '';
+    const generationToken = ++sceneGenerationSequence;
+    const requestState = state;
+    const characterId = state.activeCharacterId;
+    const requestBranch = state.campaign.activeBranchId;
+    const context = engineState();
+    const prompt = journey.scenePrompt;
+    const selectedSceneId = journey.selectedSceneId;
     isGenerating = true;
     render();
     window.setTimeout(() => {
-      journey.scenePreview = window.EchoEngine.generateScene(journey.scenePrompt, journey.selectedSceneId, engineState());
+      if (generationToken !== sceneGenerationSequence || state !== requestState || state.journeys[characterId] !== journey || state.campaign.activeBranchId !== requestBranch) return;
+      journey.scenePreview = window.EchoEngine.generateScene(prompt, selectedSceneId, context);
       journey.selectedSceneId = journey.scenePreview.sceneId;
       isGenerating = false;
       render();
@@ -2466,6 +2820,10 @@
   }
 
   function createArchive(label = null) {
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
     state.archives = state.archives || [];
     if (state.archives.length >= 6) {
       toast(langText('命运档案已满；请先删除一个非当前分支。', 'The Fate Archive is full; delete a non-current branch first.'));
@@ -2494,6 +2852,10 @@
   }
 
   function restoreArchive(archiveId) {
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
     const target = state.archives.find((archive) => archive.id === archiveId);
     if (!target?.snapshot) return;
     if (state.archives.length >= 6) {
@@ -2698,8 +3060,11 @@
 
   async function importRelationship(file) {
     try {
+      const imported = window.EchoStorage.importState(await file.text());
+      characterReplySequence += 1;
+      sceneGenerationSequence += 1;
       clearEchoPendingReplies();
-      state = window.EchoStorage.importState(await file.text());
+      state = imported;
       isTyping = false;
       isGenerating = false;
       toast(t('importDone'));
@@ -2714,6 +3079,10 @@
 
   function resetPrototype() {
     if (!window.confirm(t('confirmReset'))) return;
+    characterReplySequence += 1;
+    sceneGenerationSequence += 1;
+    isTyping = false;
+    isGenerating = false;
     clearEchoPendingReplies();
     state = window.EchoStorage.reset();
     isTyping = false;
@@ -2774,9 +3143,16 @@
       case 'send-first-contact': sendFirstContact(); break;
       case 'complete-onboarding': finishOnboarding(); break;
       case 'mainline-open': openMainline(); break;
-      case 'mainline-select-intent': mainlineState().selectedIntent = element.dataset.intentId; render(); requestAnimationFrame(() => document.getElementById('mainline-input')?.focus()); break;
-      case 'mainline-investigate': investigateMainline(); break;
-      case 'mainline-sample': chooseMainlineSample(element.dataset.sampleId); break;
+      case 'mainline-enter-scene': enterMainlineScene(); break;
+      case 'mainline-inspect': inspectMainlineClue(element.dataset.clueId); break;
+      case 'mainline-open-anomaly': openMainlineAnomaly(); break;
+      case 'mainline-toggle-part': toggleMainlinePart(element.dataset.partId); break;
+      case 'mainline-resolve-anomaly': resolveMainlineAnomaly(element.dataset.anomalyChoice); break;
+      case 'mainline-perspective': mainlineInteraction().perspective = element.dataset.perspective; render(); break;
+      case 'mainline-conversation-choice': chooseMainlineConversation(element.dataset.choiceId); break;
+      case 'mainline-conversation-continue': continueMainlineConversation(false); break;
+      case 'mainline-custom-response': continueMainlineConversation(true); break;
+      case 'mainline-classify': classifyMainlineEvidence(element.dataset.decisionId); break;
       case 'mainline-next': advanceMainline(); break;
       case 'resolve-mainline': resolveMainline(element.dataset.decision); break;
       case 'open-weaver-mainline': openWeaverMainline(); break;
@@ -2803,6 +3179,7 @@
         if (window.confirm(langText('清除所有分支档案？当前关系状态会保留。', 'Clear every branch archive? Current relationship state will remain.'))) { state.archives = []; state.saves = []; toast(langText('分支档案已清除。', 'Branch archive cleared.')); render(); }
         break;
       case 'return-title': state.resumeScreen = state.screen === 'settings' ? (state.resumeScreen || 'observatory-home') : state.screen; state.screen = 'title'; render(); break;
+      case 'website-home': showWebsiteHome(); break;
       case 'go': go(element.dataset.route); break;
       case 'start-character': startCharacter(element.dataset.characterId); break;
       case 'open-character-home': openCharacterHome(element.dataset.characterId); break;
@@ -2907,10 +3284,27 @@
     if (event.target.id === 'first-contact-input') { event.preventDefault(); sendFirstContact(); }
     if (event.target.id === 'player-name-input') { event.preventDefault(); handleAction(event.target.closest('.app-screen')?.querySelector('[data-action="save-player-name"]')); }
   });
+  app.addEventListener('input', (event) => {
+    if (event.target.id !== 'mainline-timeline') return;
+    const chapter = currentMainlineChapter();
+    const interaction = mainlineInteraction(chapter);
+    const value = Math.max(0, Math.min(7, Number(event.target.value || 0)));
+    interaction.timelineValue = value;
+    const frame = app.querySelector('.mainline-dream-frame');
+    const progressLayer = frame?.querySelector(':scope > span');
+    const time = frame?.querySelector(':scope > b');
+    if (progressLayer) progressLayer.style.setProperty('--dream-progress', `${value / 7 * 100}%`);
+    if (time) time.textContent = `${value.toFixed(1)}s`;
+    if (!interaction.timelineLocked && Math.abs(value - Number(chapter.experience.anomaly.target || 0)) <= .2) {
+      interaction.timelineLocked = true;
+      render();
+      return;
+    }
+    window.EchoStorage.save(state);
+  });
   app.addEventListener('change', (event) => {
     if (event.target.id === 'language-select') setInterfaceLanguage(event.target.value);
     if (event.target.id === 'frequency-select') { state.settings.frequency = event.target.value; render(); }
-    if (event.target.id === 'ai-mode-select') { state.settings.aiMode = ['auto', 'live', 'offline'].includes(event.target.value) ? event.target.value : 'auto'; render(); }
     if (event.target.id === 'echo-private-intent') selectEchoIntent(event.target.value);
   });
   document.addEventListener('click', (event) => {
@@ -2920,6 +3314,7 @@
     if (!control) return;
     const action = control.dataset.desktopAction;
     if (action === 'language') setInterfaceLanguage(state.language === 'zh' ? 'en' : 'zh');
+    if (action === 'website-home') showWebsiteHome();
     if (action === 'export') exportRelationship();
     if (action === 'reset') resetPrototype();
     if (action === 'focus') { demoShell.classList.toggle('focus-mode'); fitPhone(); }
@@ -2927,7 +3322,7 @@
   importFile.addEventListener('change', () => { if (importFile.files?.[0]) importRelationship(importFile.files[0]); });
   document.addEventListener('keydown', (event) => {
     const tag = document.activeElement?.tagName?.toLowerCase();
-    if (['input', 'textarea', 'select'].includes(tag) || modalContext || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    if (document.body.classList.contains('website-active') || ['input', 'textarea', 'select'].includes(tag) || modalContext || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     const normalized = ['chat', 'home', 'relationship', 'sharedEvent', 'creator'].includes(state.screen) ? 'observatory-home' : state.screen === 'generatedStory' ? 'together' : state.screen;
     const current = routeSequence.indexOf(normalized);
     if (current < 0) return;
@@ -2951,6 +3346,36 @@
   }
 
   window.addEventListener('resize', fitPhone);
+  function showWebsiteHome() {
+    closeModal();
+    document.body.classList.add('website-active');
+    if (location.hash === '#play') history.pushState(null, '', location.pathname + location.search);
+    window.dispatchEvent(new Event('echoloom:render'));
+    window.scrollTo(0, 0);
+    requestAnimationFrame(() => document.querySelector('#website-home h1')?.focus());
+  }
+  window.EchoWebsiteBridge = {
+    snapshot: () => ({ language: state.language, hasProgress: Boolean(state.onboardingStarted || state.onboardingCompleted), offlineOnly: Boolean(window.ECHOLOOM_PUBLIC?.offlineOnly), storageAvailable: window.EchoStorage.status().persistent }),
+    play: () => {
+      document.body.classList.remove('website-active');
+      if (location.hash !== '#play') history.pushState(null, '', '#play');
+      if (!state.onboardingStarted && !state.onboardingCompleted) startNewOnboarding();
+      else if (['title', 'splash'].includes(state.screen)) go(state.resumeScreen && !['title', 'splash'].includes(state.resumeScreen) ? state.resumeScreen : (state.onboardingCompleted ? 'observatory-home' : 'prologue'));
+      else render();
+      fitPhone();
+      window.scrollTo(0, 0);
+      app.focus({ preventScroll: true });
+    },
+    language: () => setInterfaceLanguage(state.language === 'zh' ? 'en' : 'zh'),
+    export: exportRelationship,
+    import: () => importFile.click()
+  };
+  window.addEventListener('popstate', () => {
+    document.body.classList.toggle('website-active', location.hash !== '#play');
+    fitPhone();
+    window.dispatchEvent(new Event('echoloom:render'));
+  });
+  if (location.hash === '#play') document.body.classList.remove('website-active');
   fitPhone();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch((error) => console.info('Service worker skipped:', error));
   window.EchoApiEngine?.initialize?.().then(() => {

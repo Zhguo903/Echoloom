@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,7 @@ import { localizeGeneratedText } from '../server/localization-service.mjs';
 import { RequestValidationError } from '../server/request-validation.mjs';
 import { generateSceneBackground, readSceneBackground, SceneValidationError } from '../server/scene-service.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = await realpath(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const args = new Set(process.argv.slice(2));
 const portArg = process.argv.find((arg) => arg.startsWith('--port='));
 const port = Number(portArg?.split('=')[1] || process.env.PORT || 5173);
@@ -33,11 +33,25 @@ const mime = new Map([
   ['.webp', 'image/webp']
 ]);
 
-function safePath(urlPath) {
-  const clean = decodeURIComponent(urlPath.split('?')[0]).replace(/^\/+/, '');
-  const normalized = path.normalize(clean || 'index.html');
-  const absolute = path.resolve(root, normalized);
-  return absolute.startsWith(root) ? absolute : null;
+const publicFiles = new Set(['index.html', 'sw.js', 'manifest.webmanifest']);
+const publicExtensions = new Set(['.html', '.css', '.js', '.json', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.woff', '.woff2', '.mp3', '.ogg', '.wav']);
+
+async function safePath(urlPath) {
+  let decoded;
+  try { decoded = decodeURIComponent(urlPath.split('?')[0]); }
+  catch { return null; }
+  if (decoded.includes('\\') || decoded.includes('\0')) return null;
+  const relative = decoded.replace(/^\/+/, '') || 'index.html';
+  const segments = relative.split('/');
+  if (segments.some((segment) => !segment || segment.startsWith('.'))) return null;
+  const publicRoot = segments[0] === 'app' || segments[0] === 'assets';
+  if (!publicFiles.has(relative) && !(publicRoot && publicExtensions.has(path.extname(relative).toLowerCase()))) return null;
+  const absolute = path.resolve(root, relative);
+  if (!absolute.startsWith(`${root}${path.sep}`)) return null;
+  try {
+    // A public-looking symlink must never expose a private repository file.
+    return await realpath(absolute) === absolute ? absolute : null;
+  } catch { return null; }
 }
 
 const server = http.createServer(async (request, response) => {
@@ -80,11 +94,20 @@ const server = http.createServer(async (request, response) => {
       response.end(image);
       return;
     }
-    let filePath = safePath(request.url || '/');
-    if (!filePath) throw new Error('Invalid path');
+    const filePath = await safePath(request.url || '/');
+    if (!filePath) {
+      response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end('Not found');
+      return;
+    }
+    if (!['GET', 'HEAD'].includes(request.method)) {
+      response.writeHead(405, { 'content-type': 'text/plain; charset=utf-8', allow: 'GET, HEAD' });
+      response.end('Use GET or HEAD.');
+      return;
+    }
     try {
       const info = await stat(filePath);
-      if (info.isDirectory()) filePath = path.join(filePath, 'index.html');
+      if (!info.isFile()) throw new Error('Not a public file');
     } catch {
       response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
       response.end('Not found');
@@ -93,10 +116,11 @@ const server = http.createServer(async (request, response) => {
     const body = await readFile(filePath);
     response.writeHead(200, {
       'content-type': mime.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream',
+      'content-length': body.length,
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff'
     });
-    response.end(body);
+    response.end(request.method === 'HEAD' ? undefined : body);
   } catch (error) {
     const known = error instanceof ProviderError || error instanceof RequestValidationError || error instanceof SceneValidationError || Number.isInteger(error?.status);
     const status = known ? (error.status || 400) : 500;

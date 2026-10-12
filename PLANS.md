@@ -1,5 +1,41 @@
 # EchoLink MVP Plan
 
+## GitHub publication — 2026-10-12
+
+The user requested pushing the latest work to the existing origin/main. Validate the complete working tree with npm test and git diff --check, include the existing local commits plus current website/story improvements, keep credentials and generated handoff archives ignored, commit a portable project inventory, push normally without force, and verify that the remote branch matches the local commit. The detailed machine-specific inventory is preserved locally under ignored output/github/.
+
+## GitHub source handoff — 2026-10-12
+
+1. Package the current working source (including uncommitted website additions), original assets, tests, and portable documentation.
+2. Exclude Git metadata, credentials, caches, private archives, managed hosting checkouts, and unrelated research/report outputs; replace the package's machine-specific inventory with a portable project inventory.
+3. Test the extracted source package and build its static website, then create and verify both ZIP archives in output/github/.
+4. Provide local file locations and GitHub upload instructions. No remote push is part of this packaging handoff.
+
+Status: Complete — created a portable 119-file source ZIP and a 61-file static website ZIP in output/github/. The extracted source passes all seven npm test suites and builds successfully without credentials or dependency installation. ZIP integrity and excluded-path checks pass. The source package includes a Chinese GitHub upload guide; the original working repository and its remote history are preserved.
+
+## Public EchoLoom website — 2026-10-11
+
+Product outcome: visitors can discover EchoLoom, start or resume the story on mobile or desktop without installing anything, and control their own local relationship archive. Story creates attraction before chat; independent character journeys and source-linked memory remain intact. The first public release uses the existing deterministic engine, with no accounts, server synchronization, or secret credentials in the published bundle.
+
+1. Inventory the app, original assets, product/research documents, and separate reference archives; preserve existing uncommitted work.
+2. Add a bright bilingual website entrance, clear play/resume controls, character introduction, help, and local-data disclosure using existing design tokens and original artwork.
+3. Harden static serving, add an allowlisted publish build, keep public requests offline, and make storage failures recoverable. Scope offline caching to public assets.
+4. Run the existing automated suite plus relevant public-build/security checks; verify first story interaction, language, memory/archive controls, mobile 393 × 852, desktop, and console output.
+5. Package only reviewed public files, publish with public access, record the verified URL, and document the file inventory and deployment workflow.
+
+Status: Complete — published public version 1 at https://echoloom-stories.zestybloom32.chatgpt.site on 2026-10-11. All seven automated suites pass. `npm start` and the public build run successfully. Browser checks cover Chinese/English entrance, start/continue, the complete first-contact flow and refresh recovery locally, and live mobile/desktop layouts without overflow, broken images, or console errors. The 61-file public artifact excludes private sources and makes no provider requests. Browser download-event verification was unavailable in the in-app browser; archive export/import/reset and migration are covered by automated tests. Details and remaining scope are in docs/PUBLIC_WEBSITE.md.
+
+## Gemini-first single-provider mode — 2026-08-11
+
+- Make every free-form core-character reply path attempt Gemini without requiring a user setting: first contact, Story, Chat, generated scenes, and private EchoLink.
+- Normalize new and imported relationship state to `aiMode: live`, replace the provider selector with a read-only Gemini-first explanation, and update the desktop status card.
+- Preserve the deterministic `EchoEngine` only as an automatic per-turn fallback for missing configuration, timeouts, rate limits, malformed responses, and offline classroom use.
+- Keep application-owned investigation evidence, group/system events, character separation, memory controls, and the four-method `EchoEngine` interface unchanged.
+
+Success criteria: old `auto` and `offline` archives load as `live`; every core free-text reply calls the live adapter; the UI no longer asks users to switch providers; provider failure remains recoverable; export/import and all automated tests pass; and 393 × 852 plus desktop layouts remain usable.
+
+Status: Complete — legacy provider settings normalize to `live`; first contact and every existing core-character free-text path pass `aiMode: live`; the provider selector is replaced by a fixed Gemini-first explanation; `npm test` passes; and 393 × 852 plus 1440 × 1000 checks show the connected state without overflow or console errors.
+
 ## EchoLink intent-button feedback — 2026-08-11
 
 - Make the three fallback intent suggestions visibly selectable instead of silently changing hidden metadata.
@@ -853,3 +889,17 @@ Validation:
 - The slide separates the current offline web prototype from the production mobile and server path, and covers client experience, backend and source-linked memory, AI safety, and build operations.
 - Added internal architecture references and primary technical sources in speaker notes; the prohibited product-building-tool name does not appear in slide content or notes.
 - PowerPoint rendering completed successfully, the slide test reported no overflow, and the repository smoke and schema-v8 engine suites pass.
+# Scene-led investigation chapters — 2026-08-11
+
+## Product outcome
+
+Replace the repeated abstract-question template in Chapters 2–6 with five scene beats: entry, active investigation, anomaly, character conversation, and a visible consequence. Evidence comes from interacting with the world, never from an AI reply or a relationship score. Free text remains available as an optional custom response inside the character beat rather than occupying every screen.
+
+## Implementation plan
+
+1. Add a distinct interaction model for every current investigation chapter: archive hotspots and dream scrubbing, memory-fragment reconstruction, a live route trace with a chosen interruption point, deleted-world object recovery, and dual-perspective audit comparison.
+2. Replace the old `briefing/sample` renderer and handlers with the five-beat state machine, an evidence tray, scene hotspots, VN-style dialogue, optional custom response, and chapter-specific consequence choices.
+3. Upgrade storage to schema v12 with canonical clue discovery, hypotheses, chapter flags, memory stability, relationship effects, and archive classification; conservatively migrate schema-v11 progress and preserve import/export compatibility.
+4. Update state and smoke coverage plus product/architecture notes, then verify tests, offline startup, 393 × 852, desktop, console behaviour, and export/reset/import recovery.
+
+Status: Complete — `npm test` passes; Chapter 2 was completed end to end in the browser, including all three hotspots, evidence tray, 04.7-second timeline unlock, delayed Wen Sheng entrance, relationship choice, archive classification, visible result, and Chapter 3 hand-off. English copy, schema-v11 migration, schema-v12 export/reset/import round-trip, 393 × 852, 1440 × 1000, and warning/error logs were also verified.

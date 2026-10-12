@@ -1,7 +1,9 @@
 (() => {
   const KEY = 'echoloom.demo.v2';
   const LEGACY_KEY = 'echoloom-demo-state-v1';
-  const SCHEMA_VERSION = 11;
+  const SCHEMA_VERSION = 12;
+  let sessionState = null;
+  let storageError = null;
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const data = () => window.ECHOLOOM_DATA;
@@ -21,11 +23,9 @@
     return /[\u3400-\u9fff]/.test(value) ? 'zh' : 'en';
   }
 
-  function mergeSettings(saved = {}, sourceVersion = SCHEMA_VERSION) {
+  function mergeSettings(saved = {}) {
     const base = data().defaultState.settings;
-    const savedMode = ['auto', 'live', 'offline'].includes(saved.aiMode) ? saved.aiMode : base.aiMode;
-    const aiMode = sourceVersion < 10 && savedMode === 'offline' ? 'auto' : savedMode;
-    return { ...base, ...saved, aiMode };
+    return { ...base, ...saved, aiMode: 'live' };
   }
 
   function migrateRelationship(saved = {}) {
@@ -245,12 +245,45 @@
     const base = data().createCampaign();
     const baseMainline = data().createMainline();
     const savedMainline = saved.mainline && typeof saved.mainline === 'object' ? saved.mainline : {};
+    const discoveredClues = {};
+    const chapterFlags = {};
+    const interactionState = {};
+    for (const chapter of data().mainlineContent.chapters) {
+      const validClues = new Set(chapter.experience?.investigation?.items?.map((item) => item.id) || []);
+      discoveredClues[chapter.id] = Array.isArray(savedMainline.discoveredClues?.[chapter.id])
+        ? savedMainline.discoveredClues[chapter.id].filter((id) => validClues.has(id)).slice(0, validClues.size)
+        : [];
+      if (sourceVersion < 12 && savedMainline.phase === 'sample' && chapter === data().mainlineContent.chapters[number(savedMainline.chapterIndex, 0)]) {
+        discoveredClues[chapter.id] = [...validClues];
+      }
+      chapterFlags[chapter.id] = savedMainline.chapterFlags?.[chapter.id] && typeof savedMainline.chapterFlags[chapter.id] === 'object'
+        ? { ...savedMainline.chapterFlags[chapter.id] }
+        : {};
+      interactionState[chapter.id] = savedMainline.interactionState?.[chapter.id] && typeof savedMainline.interactionState[chapter.id] === 'object'
+        ? { ...savedMainline.interactionState[chapter.id] }
+        : {};
+    }
+    const savedPhase = sourceVersion < 12 && savedMainline.phase === 'briefing'
+      ? 'entry'
+      : sourceVersion < 12 && savedMainline.phase === 'sample' ? 'anomaly' : savedMainline.phase;
+    const relationshipStats = Object.fromEntries(data().characterIds.map((id) => {
+      const source = savedMainline.relationshipStats?.[id];
+      if (!source || typeof source !== 'object') return [id, {}];
+      return [id, Object.fromEntries(Object.entries(source).filter(([, value]) => Number.isFinite(Number(value))).map(([key, value]) => [key, number(value, 0)]))];
+    }));
     const mainline = {
       ...baseMainline,
       ...savedMainline,
       chapterIndex: Math.max(0, Math.min(data().mainlineContent.chapters.length - 1, number(savedMainline.chapterIndex, 0))),
-      phase: ['briefing', 'sample', 'result', 'finale', 'resolved'].includes(savedMainline.phase) ? savedMainline.phase : 'briefing',
+      phase: ['entry', 'investigation', 'anomaly', 'conversation', 'decision', 'result', 'finale', 'resolved'].includes(savedPhase) ? savedPhase : 'entry',
       responses: Array.isArray(savedMainline.responses) ? savedMainline.responses.slice(-20) : [],
+      discoveredClues,
+      currentHypothesis: typeof savedMainline.currentHypothesis === 'string' ? savedMainline.currentHypothesis.slice(0, 100) : null,
+      chapterFlags,
+      memoryStability: Math.max(0, Math.min(100, number(savedMainline.memoryStability, 100))),
+      relationshipStats,
+      archiveClassification: ['erased-person-evidence', 'unknown-shared-memory', 'private-unarchived'].includes(savedMainline.archiveClassification) ? savedMainline.archiveClassification : null,
+      interactionState,
       confirmedAnchorIds: Array.isArray(savedMainline.confirmedAnchorIds)
         ? savedMainline.confirmedAnchorIds.filter((id) => data().mainlineContent.chapters.some((chapter) => chapter.anchor.id === id))
         : [],
@@ -329,6 +362,7 @@
   }
 
   function load() {
+    if (sessionState) return clone(sessionState);
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) return mergeState(JSON.parse(raw));
@@ -338,20 +372,34 @@
       save(migrated);
       return migrated;
     } catch (error) {
-      console.warn('EchoLoom state could not be loaded:', error);
+      storageError = error?.name || 'StorageUnavailable';
       return clone(data().defaultState);
     }
   }
 
   function save(state) {
     const next = { ...state, version: SCHEMA_VERSION, lastUpdated: new Date().toISOString() };
-    localStorage.setItem(KEY, JSON.stringify(next));
+    sessionState = next;
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+      storageError = null;
+      return true;
+    } catch (error) {
+      storageError = error?.name || 'StorageUnavailable';
+      return false;
+    }
   }
 
   function reset() {
-    localStorage.removeItem(KEY);
-    localStorage.removeItem(LEGACY_KEY);
-    return clone(data().defaultState);
+    sessionState = clone(data().defaultState);
+    try {
+      localStorage.removeItem(KEY);
+      localStorage.removeItem(LEGACY_KEY);
+      storageError = null;
+    } catch (error) {
+      storageError = error?.name || 'StorageUnavailable';
+    }
+    return clone(sessionState);
   }
 
   function exportState(state) {
@@ -372,5 +420,5 @@
     return mergeState(source);
   }
 
-  window.EchoStorage = { load, save, reset, exportState, importState };
+  window.EchoStorage = { load, save, reset, exportState, importState, status: () => ({ persistent: !storageError, errorCode: storageError }) };
 })();

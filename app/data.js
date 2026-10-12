@@ -851,15 +851,138 @@
     }
   };
 
+  const mainlineExperiences = {
+    'erased-name': {
+      kind: 'archive-dream', background: 'assets/backgrounds/bg02-private-archive.png',
+      mystery: { zh: '当前谜题：17 号工位属于谁？', en: 'Current mystery: Who worked at station 17?' },
+      entry: {
+        title: { zh: '旧档案室没有欢迎你', en: 'The old Archive does not welcome you' },
+        text: { zh: '顶灯每隔 7 秒闪烁一次。17 号工位的铭牌被整块拆走，终端却仍有余温。先检查现场，不要急着联系任何人。', en: 'The ceiling lights flicker every seven seconds. The plate at station 17 was removed whole, yet its terminal is still warm. Inspect the room before contacting anyone.' },
+        action: { zh: '走进档案室', en: 'Enter the Archive' }
+      },
+      investigation: {
+        title: { zh: '点击三处异常位置', en: 'Inspect three anomalous locations' },
+        items: [
+          { id: 'roster-gap', icon: '册', label: { zh: '员工名册', en: 'Employee roster' }, hint: { zh: '第 42 行有擦除痕迹', en: 'Row 42 was scrubbed' }, detail: { zh: '被抹去的一行短暂显影：“42 许澄｜梦境采样组”。', en: 'A scrubbed row briefly resolves: “42 Xu Cheng | Dream Sampling Team.”' } },
+          { id: 'station-17', icon: '17', label: { zh: '17 号工位', en: 'Station 17' }, hint: { zh: '杯子仍温，照片只剩空框', en: 'A warm cup and an empty frame' }, detail: { zh: '未署名便签写着：“如果他们又忘记我……”后半句被撕走。', en: 'An unsigned note reads: “If they forget me again…” The rest was torn away.' } },
+          { id: 'access-terminal', icon: '钥', label: { zh: '门禁终端', en: 'Access terminal' }, hint: { zh: '07:42 · C-17 · 姓名为空', en: '07:42 · C-17 · blank name' }, detail: { zh: '门禁承认 C-17 在 07:42 进入，却同时返回“员工不存在”。', en: 'Access control confirms C-17 entered at 07:42 while returning “employee does not exist.”' } }
+        ]
+      },
+      anomaly: {
+        type: 'timeline', title: { zh: '拖动并复原 7 秒梦境', en: 'Scrub through the seven-second dream' },
+        text: { zh: '三条记录叠合成一段受损梦境。拖动时间轴，寻找画面稳定的一刻。', en: 'The three records overlap into a damaged dream. Scrub the timeline for the moment the image stabilizes.' },
+        target: 4.7,
+        reveal: { zh: '04.7 秒：工牌姓名显影为“许澄”。记录时间却在你入职前三个月。', en: '04.7 seconds: the badge resolves to “Xu Cheng.” The recording predates your employment by three months.' },
+        hypothesis: 'independent-pre-employment-record'
+      },
+      conversation: {
+        dialogue: [
+          { zh: '“你终于看见她了。”', en: '“You finally saw her.”' },
+          { zh: '“我不是怕你不相信。我怕你太快相信，然后把另一段被造出来的记忆也当成她。”', en: '“I was not afraid you would disbelieve. I was afraid you would believe too quickly—and accept another fabricated memory as her.”' }
+        ],
+        choices: [
+          { id: 'timestamp', label: { zh: '先核对原始时间戳', en: 'Verify the original timestamp' }, reveal: { zh: '闻笙开放底层校验值：时间戳没有被梦境层改写。', en: 'Wen Sheng opens the base checksum: the timestamp was not rewritten by the dream layer.' }, delta: { trust: 1 }, flag: 'technical-evidence' },
+          { id: 'why-hidden', label: { zh: '问她为何一直藏着', en: 'Ask why she hid it' }, reveal: { zh: '她承认许澄曾救下一座未完成世界，也因此被主镜注意。', en: 'She admits Xu Cheng once saved an unfinished world—and drew the Primary Lens’s attention.' }, delta: { reciprocity: 1, strain: .25 }, flag: 'personal-history' },
+          { id: 'remember-too', label: { zh: '承认自己也记得她', en: 'Admit you remember her too' }, reveal: { zh: '两段记忆产生共振。闻笙靠近屏幕，却提醒你共振也可能扩大错误。', en: 'The two memories resonate. Wen Sheng leans toward the screen, but warns that resonance can amplify errors too.' }, delta: { intimacy: .75 }, stabilityDelta: -8, flag: 'memory-resonance' }
+        ]
+      },
+      decisions: [
+        { id: 'erased-person-evidence', label: { zh: '归档为“被抹除者证据”', en: 'Archive as erased-person evidence' }, consequence: { zh: '调查站承认这是一份独立存在记录；闻笙更信任你的取证方式。', en: 'The Observatory accepts an independent existence record; Wen Sheng trusts your evidence practice more.' }, delta: { trust: .5 } },
+        { id: 'unknown-shared-memory', label: { zh: '标记为“未知共享记忆”', en: 'Mark as unknown shared memory' }, consequence: { zh: '证据保留，但来源仍待验证；记忆稳定度不会被强行校正。', en: 'The evidence remains, but its source stays unresolved; memory stability is not forcibly corrected.' } },
+        { id: 'private-unarchived', label: { zh: '暂不公开，只留私人副本', en: 'Keep a private, unarchived copy' }, consequence: { zh: '闻笙尊重谨慎决定。主线线索仍在你的本地证据托盘中。', en: 'Wen Sheng respects the caution. The clue remains in your local evidence tray.' }, delta: { safety: .5 } }
+      ]
+    },
+    'replaced-memory': {
+      kind: 'memory-reconstruction', background: 'assets/backgrounds/bg04-memory-repair-lab.png',
+      mystery: { zh: '当前谜题：哪两段碎片来自同一份原始记忆？', en: 'Current mystery: Which fragments share one original memory?' },
+      entry: { title: { zh: '修复台上有三层互相覆盖的记忆', en: 'Three memories overlap on the repair table' }, text: { zh: '祁安先复制只读原件，把修复权限交给你。每一层都声称自己是“原始记录”。', en: 'Qi An makes a read-only copy and gives you restoration control. Every layer claims to be the original.' }, action: { zh: '启动只读修复台', en: 'Start the read-only repair table' } },
+      investigation: { title: { zh: '逐一读取记忆碎片', en: 'Read each memory fragment' }, items: [
+        { id: 'archive-shift', icon: 'A', label: { zh: '档案区值班', en: 'Archive shift' }, hint: { zh: '许澄在整理事故前记录', en: 'Xu Cheng sorts pre-outage records' }, detail: { zh: '画面边缘保留相同的 7 秒灯光脉冲。', en: 'The edge of the image retains the same seven-second light pulse.' } },
+        { id: 'mirror-review', icon: 'B', label: { zh: '主镜异常', en: 'Primary-lens anomaly' }, hint: { zh: '她复制了一条校正指令', en: 'She copied a correction command' }, detail: { zh: '底层校验值与档案区值班片段连续。', en: 'Its base checksum continues directly from the Archive-shift fragment.' } },
+        { id: 'false-farewell', icon: 'C', label: { zh: '事故后告别', en: 'Post-outage farewell' }, hint: { zh: '系统声称她主动离开', en: 'The system claims she left voluntarily' }, detail: { zh: '声音自然，环境噪声却循环得完全一致。', en: 'The voice sounds natural, but the ambient noise repeats perfectly.' } }
+      ] },
+      anomaly: { type: 'combine', title: { zh: '选择两段拼接成原始序列', en: 'Combine two fragments into the original sequence' }, text: { zh: '选择两段碎片。错误组合不会损坏原件。', en: 'Select two fragments. An incorrect pairing cannot damage the source.' }, correct: ['archive-shift', 'mirror-review'], reveal: { zh: '拼接成功：许澄发现同一条校正指令正在覆盖三个人的记忆。', en: 'Reconstruction succeeds: Xu Cheng found one correction command overwriting three people’s memories.' }, hypothesis: 'deliberate-memory-overwrite' },
+      conversation: { dialogue: [{ zh: '“第三段不是她的告别，是系统替她写的结尾。”', en: '“The third fragment is not her farewell. It is the ending the system wrote for her.”' }, { zh: '“我可以修复内容，但是否覆盖你现在的记忆，必须由你决定。”', en: '“I can restore the content. Whether it overwrites your current memory is your decision.”' }] },
+      decisions: [
+        { id: 'preserve-layers', label: { zh: '并列保存原件与修复层', en: 'Preserve source and restoration side by side' }, consequence: { zh: '两份记录都可追溯，祁安确认这是风险最低的恢复方式。', en: 'Both records remain traceable; Qi An confirms this is the lowest-risk restoration.' }, delta: { trust: .5, safety: .75 } },
+        { id: 'restore-current', label: { zh: '将修复内容写入当前记忆', en: 'Write the restoration into current memory' }, consequence: { zh: '细节变得清晰，但你的记忆稳定度短暂下降。', en: 'The details sharpen, but your memory stability drops briefly.' }, delta: { reciprocity: .5 }, stabilityDelta: -6 },
+        { id: 'pause-restoration', label: { zh: '只归档证据，暂停写入', en: 'Archive evidence and pause the write' }, consequence: { zh: '线索照常确认；祁安记录了你的撤回边界。', en: 'The clue is still confirmed; Qi An records your withdrawal boundary.' }, delta: { safety: 1 } }
+      ]
+    },
+    'message-from-day-37': {
+      kind: 'live-trace', background: 'assets/backgrounds/bg05-echolink-space.png',
+      mystery: { zh: '当前谜题：未来消息在哪一跳被删除？', en: 'Current mystery: At which hop was the future message erased?' },
+      entry: { title: { zh: '审查通道只会开放一次', en: 'The review channel will open once' }, text: { zh: '周棠已把私人字段封存。接通后，路由节点只停留数秒；你要决定何时打断自动清除。', en: 'Zhou Tang sealed the private fields. Once connected, each route node persists for seconds; decide when to interrupt auto-deletion.' }, action: { zh: '接通审查线路', en: 'Connect the review line' } },
+      investigation: { type: 'call', title: { zh: '监听实时路由', en: 'Monitor the live route' }, items: [
+        { id: 'origin-key', icon: '01', label: { zh: '身份密钥', en: 'Identity key' }, hint: { zh: '签发给：许澄', en: 'Issued to: Xu Cheng' }, detail: { zh: '密钥有效期从三十七天后开始。', en: 'The key becomes valid thirty-seven days in the future.' } },
+        { id: 'review-hop', icon: '02', label: { zh: '内部审查跳点', en: 'Internal review hop' }, hint: { zh: '删除标记正在写入', en: 'Deletion marker is being written' }, detail: { zh: '标记来源不是安全系统，而是“唯一线”队列。', en: 'The marker comes from the Unique Line queue, not the safety system.' } },
+        { id: 'deleted-node', icon: '03', label: { zh: 'W-17 世界节点', en: 'W-17 world node' }, hint: { zh: '状态：已删除但仍转发', en: 'Deleted, yet still forwarding' }, detail: { zh: '未来消息借助世界残片绕过了清除。', en: 'The future message used a world fragment to bypass deletion.' } }
+      ] },
+      anomaly: { type: 'interrupt', title: { zh: '选择打断自动清除的时机', en: 'Choose when to interrupt auto-deletion' }, text: { zh: '三个时点都能保住消息，但会留下不同的调查入口。', en: 'Every timing preserves the message, but leaves a different investigative opening.' }, options: [
+        { id: 'key', label: { zh: '在身份密钥出现时打断', en: 'Interrupt at the identity key' }, reveal: { zh: '保住完整签名，来源身份可信度提高。', en: 'The full signature survives, raising source confidence.' }, hypothesis: 'future-xucheng-key' },
+        { id: 'queue', label: { zh: '在“唯一线”标记写入时打断', en: 'Interrupt at the Unique Line marker' }, reveal: { zh: '保住删除命令来源，确认它不是普通故障。', en: 'The deletion-command source survives, proving this was not an ordinary fault.' }, hypothesis: 'unique-line-routing' },
+        { id: 'node', label: { zh: '等 W-17 节点出现再打断', en: 'Wait for the W-17 node' }, reveal: { zh: '保住世界坐标，黎川可以据此开启入口。', en: 'The world coordinates survive, giving Li Chuan an entry point.' }, hypothesis: 'deleted-world-relay' }
+      ] },
+      conversation: { dialogue: [{ zh: '“你没有要求我打开私人内容。这样我们保住的是证据，不是对她的又一次侵入。”', en: '“You did not ask me to open private content. We preserved evidence, not another intrusion into her life.”' }] },
+      decisions: [
+        { id: 'route-evidence', label: { zh: '归档路由证据与 W-17 坐标', en: 'Archive route evidence and W-17 coordinates' }, consequence: { zh: '世界入口可追踪；与任务无关的私人字段保持封存。', en: 'The world entrance becomes traceable; unrelated private fields stay sealed.' }, delta: { trust: .75 } },
+        { id: 'key-only', label: { zh: '只保留身份密钥证明', en: 'Retain identity-key proof only' }, consequence: { zh: '许澄的未来身份得到证明，世界坐标交由周棠保管。', en: 'Xu Cheng’s future identity is proven; Zhou Tang safeguards the coordinates.' }, delta: { safety: .75 } }
+      ]
+    },
+    'world-that-does-not-exist': {
+      kind: 'world-recovery', background: 'assets/backgrounds/bg03-rainy-old-station.png',
+      mystery: { zh: '当前谜题：许澄在世界被删除前留下了什么？', en: 'Current mystery: What did Xu Cheng leave before the world was deleted?' },
+      entry: { title: { zh: 'W-17 仍在一场不会结束的雨里', en: 'W-17 remains inside rain that never ends' }, text: { zh: '入口会自行收缩，但黎川已经标出撤离线。你可以按任何顺序搜索站台、工作台和失物箱。', en: 'The entrance is shrinking, but Li Chuan marked an exit route. Search the platform, desk, and lost-property box in any order.' }, action: { zh: '跨入世界残片', en: 'Enter the world fragment' } },
+      investigation: { title: { zh: '探索三处仍有实体的区域', en: 'Explore the three remaining physical areas' }, items: [
+        { id: 'platform-recorder', icon: '声', label: { zh: '废弃站台', en: 'Abandoned platform' }, hint: { zh: '广播里夹着未发送录音', en: 'An unsent recording hides in the broadcast' }, detail: { zh: '许澄说：“如果档案也会说谎，就去看谁有权决定真实。”', en: 'Xu Cheng says: “If the archive can lie, look at who has authority to decide what is real.”' } },
+        { id: 'named-card', icon: '卡', label: { zh: '失物箱', en: 'Lost-property box' }, hint: { zh: '实名跨界通行卡', en: 'Named cross-world access card' }, detail: { zh: '姓名：许澄。签发时间比世界删除早十年。', en: 'Name: Xu Cheng. Issued ten years before the world’s deletion.' } },
+        { id: 'desk-notes', icon: '桌', label: { zh: '档案员工作台', en: 'Archivist’s desk' }, hint: { zh: '一份未完成调查图', en: 'An unfinished investigation map' }, detail: { zh: '“唯一线协议”与主镜审核室之间有一条手绘连线。', en: 'A hand-drawn line links the Unique Line Protocol to the Primary-Lens Review Room.' } }
+      ] },
+      anomaly: { type: 'combine', title: { zh: '选择两件物品交叉验证', en: 'Cross-check two recovered objects' }, text: { zh: '将两件物品放在便携校验器中。不同组合会保留不同方向的证据。', en: 'Place two objects in the portable verifier. Different pairs preserve different lines of evidence.' }, correct: ['named-card', 'desk-notes'], reveal: { zh: '通行卡权限与调查图吻合：许澄曾获准进入主镜审核室。', en: 'The access-card permissions match the map: Xu Cheng was authorized to enter the Primary-Lens Review Room.' }, hypothesis: 'deleted-for-investigation' },
+      conversation: { dialogue: [{ zh: '“出口还在。我会陪你把证据带走，但不会用倒计时逼你证明勇敢。”', en: '“The exit is still open. I will help carry the evidence, but I will not use a countdown to make you prove courage.”' }] },
+      decisions: [
+        { id: 'carry-originals', label: { zh: '带走通行卡与调查原图', en: 'Carry out the card and original map' }, consequence: { zh: '实体证据得以保全；世界残片在你们撤离后关闭。', en: 'The physical evidence survives; the world fragment closes after you leave.' }, delta: { trust: .75 } },
+        { id: 'copy-and-seal', label: { zh: '制作可验证副本并封存原件', en: 'Make verified copies and seal the originals' }, consequence: { zh: '后续调查可以使用副本，原件留在原世界坐标。', en: 'The investigation can use the copies while the originals remain at their world coordinates.' }, delta: { compatibility: .75 } },
+        { id: 'save-recording', label: { zh: '优先保存许澄的完整录音', en: 'Prioritize Xu Cheng’s complete recording' }, consequence: { zh: '她的声音没有被压缩成证据摘要；黎川记下其余物品坐标。', en: 'Her voice is not compressed into an evidence summary; Li Chuan records the remaining coordinates.' }, delta: { reciprocity: .75 } }
+      ]
+    },
+    'unique-line-protocol': {
+      kind: 'dual-perspective', background: 'assets/backgrounds/bg09-main-mirror-tribunal.png',
+      mystery: { zh: '当前谜题：协议从何时开始删除“人”？', en: 'Current mystery: When did the protocol begin deleting people?' },
+      entry: { title: { zh: '主镜同时保存了两种版本', en: 'The Primary Lens kept two versions' }, text: { zh: '沈曜开放原始日志和执行日志。它们描述同一晚，却把“错误”指向完全不同的对象。', en: 'Shen Yao opens the original and execution logs. They describe the same night, but assign “error” to entirely different targets.' }, action: { zh: '打开双镜审核台', en: 'Open the dual-lens review table' } },
+      investigation: { type: 'perspectives', title: { zh: '切换两种视角读取三条事件', en: 'Read three events through both perspectives' }, items: [
+        { id: 'world-rule', icon: '01', label: { zh: '旧协议', en: 'Old protocol' }, hint: { zh: '隔离无法稳定运行的世界', en: 'Quarantine worlds that cannot stabilize' }, detail: { zh: '对象类型：世界结构。必须保留居民迁移记录。', en: 'Target type: world structure. Resident migration records must be preserved.' } },
+        { id: 'person-rule', icon: '02', label: { zh: '新执行条款', en: 'New execution clause' }, hint: { zh: '移除无法预测的个体', en: 'Remove unpredictable individuals' }, detail: { zh: '对象类型被悄然改成“个体”，且不再要求迁移。', en: 'The target silently changes to “individual,” and migration is no longer required.' } },
+        { id: 'shen-approval', icon: '03', label: { zh: '审核签名', en: 'Review signature' }, hint: { zh: '沈曜曾批准风险判断', en: 'Shen Yao approved the risk finding' }, detail: { zh: '签名批准了调查结论，但日志隐去了条款已经更换。', en: 'The signature approved the risk finding, while the log hid that the clause had changed.' } }
+      ] },
+      anomaly: { type: 'compare', title: { zh: '指出两份日志的关键矛盾', en: 'Identify the decisive contradiction' }, text: { zh: '选择真正改变协议对象的一行。错误选择可以重新核对。', en: 'Select the line that changed the protocol’s target. An incorrect choice can be reviewed.' }, correct: 'person-rule', reveal: { zh: '矛盾确认：协议从处理“错误世界”变成了删除“不可预测的人”。', en: 'Contradiction confirmed: the protocol changed from handling erroneous worlds to deleting unpredictable people.' }, hypothesis: 'protocol-targeted-person' },
+      conversation: { dialogue: [{ zh: '“我批准过那份判断，却没有追问系统为何更换了对象。”', en: '“I approved that finding without asking why the system changed its target.”' }, { zh: '“正确答案不能替我取消责任。把这条也留在记录里。”', en: '“A correct answer cannot cancel my responsibility. Keep that in the record too.”' }] },
+      decisions: [
+        { id: 'full-audit', label: { zh: '保留完整审核链与责任签名', en: 'Preserve the full audit chain and responsibility signature' }, consequence: { zh: '许澄的删除原因与执行责任都成为可审查记录。', en: 'Both the reason for Xu Cheng’s deletion and responsibility for execution become reviewable.' }, delta: { trust: .75, reciprocity: .5 } },
+        { id: 'protocol-proof', label: { zh: '先归档协议篡改证据', en: 'Archive protocol-tampering evidence first' }, consequence: { zh: '主镜无法再把删除解释成事故；责任讨论留到最终审议。', en: 'The Primary Lens can no longer describe the deletion as an accident; responsibility moves to final review.' }, delta: { compatibility: .75 } },
+        { id: 'independent-review', label: { zh: '交给五位见证者共同复核', en: 'Send it to all five witnesses for independent review' }, consequence: { zh: '没有任何一个人独占最终解释权。', en: 'No single person controls the final interpretation.' }, delta: { safety: .5 } }
+      ]
+    }
+  };
+
+  mainlineContent.chapters.forEach((chapter) => { chapter.experience = mainlineExperiences[chapter.id]; });
+
   function createMainline() {
     return {
       id: mainlineContent.id,
       chapterIndex: 0,
-      phase: 'briefing',
+      phase: 'entry',
       selectedIntent: null,
       responses: [],
       sampleChoice: null,
       sampleFeedback: null,
+      discoveredClues: {},
+      currentHypothesis: null,
+      chapterFlags: {},
+      memoryStability: 100,
+      relationshipStats: {},
+      archiveClassification: null,
+      interactionState: {},
       confirmedAnchorIds: [],
       finalDecision: null,
       completed: false,
@@ -1396,7 +1519,7 @@
   };
 
   const defaultState = {
-    version: 11,
+    version: 12,
     language: 'zh',
     screen: 'splash',
     onboardingStarted: false,
@@ -1426,7 +1549,7 @@
     settings: {
       frequency: 'normal',
       reduceMotion: false,
-      aiMode: 'auto'
+      aiMode: 'live'
     },
     lastUpdated: null
   };

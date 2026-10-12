@@ -1,6 +1,6 @@
 # Optional Gemini + Supabase + Cloudflare loop
 
-EchoLoom now includes a deliberately constrained live path while keeping the deterministic `EchoEngine` as the default and automatic fallback. The UI and its four-method contract remain unchanged:
+EchoLoom now uses a deliberately constrained Gemini-first path for core-character free-form replies while keeping the deterministic `EchoEngine` as an automatic per-turn fallback. The four-method contract remains unchanged:
 
 - `storyReply(input, state)`
 - `chatReply(input, state)`
@@ -26,7 +26,7 @@ free-text input
 1. Copy `.env.example` to `.env`. The zero-dependency server reads `.env` automatically; process environment variables take precedence.
 2. Add `GEMINI_API_KEY` to enable live dialogue. `GEMINI_MODEL` defaults to `gemini-3.6-flash`; `GEMINI_FALLBACK_MODEL` defaults to the stable, higher-throughput `gemini-3.5-flash-lite` and is tried when the primary model returns 429.
 3. Optionally add Supabase and/or Cloudflare values described below.
-4. Run `npm start`. Schema v11's default **Automatic** mode detects the server key and enables Gemini; Settings also offers **Always try Gemini** and **Force offline simulation**. Never open a live test by serving the browser files from a different server.
+4. Run `npm start`. The app automatically attempts Gemini for every supported free-form character reply; Settings shows this as a fixed **Gemini first** policy instead of a provider selector. Never open a live test by serving the browser files from a different server.
 
 Do not commit `.env`. The provider-status endpoint reports only whether a provider is configured and which public model name is selected; it never returns a credential.
 

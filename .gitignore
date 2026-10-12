@@ -7,9 +7,16 @@ node_modules/
 !.env.example
 coverage/
 dist/
+.echoloom-public-*/
 .cache/
 
 # Generated report previews and extracted assignment pages.
 # Keep the final report in output/report/ and the report source in tmp/report_work/.
 tmp/report_render*/
 tmp/pdfs/
+
+# Managed public Site checkout; source of truth is app/ and assets/.
+sites/echoloom-public/
+
+# Generated GitHub handoff archives.
+output/github/

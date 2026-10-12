@@ -3,19 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f1324" />
-  <meta name="description" content="EchoLoom story-first AI relationship interactive prototype" />
-  <title>EchoLoom Interactive Demo</title>
+  <meta name="theme-color" content="#fbf8f1" />
+  <meta name="description" content="EchoLoom：在第十七秒之后，找回一个被世界遗忘的人。探索五位角色的故事，建立属于你的关系与记忆。无需注册，即刻开始。" />
+  <meta name="application-name" content="EchoLoom Interactive Demo" />
+  <meta property="og:title" content="EchoLoom · 有些相遇，值得被记住" />
+  <meta property="og:description" content="A story worth entering. People worth remembering. A bilingual interactive story with five independent characters and private local saves." />
+  <meta property="og:type" content="website" />
+  <title>EchoLoom · 有些相遇，值得被记住</title>
   <link rel="icon" href="assets/brand/echoloom-app-icon.png" type="image/png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="app/styles.css?v=47" />
+  <link rel="apple-touch-icon" href="assets/brand/echoloom-app-icon.png" />
+  <link rel="stylesheet" href="app/styles.css?v=52" />
+  <link rel="stylesheet" href="app/website.css?v=1" />
 </head>
-<body>
+<body class="website-active">
+  <div id="website-home"></div>
+  <noscript><p style="padding:32px">EchoLoom 需要启用 JavaScript 才能进入互动故事。Please enable JavaScript to play EchoLoom.</p></noscript>
   <div class="ambient-orb ambient-orb-a" aria-hidden="true"></div>
   <div class="ambient-orb ambient-orb-b" aria-hidden="true"></div>
 
   <div class="demo-shell" id="demo-shell">
-    <aside class="desktop-panel desktop-panel-left" aria-label="Demo navigation">
+    <aside class="desktop-panel desktop-panel-left" aria-label="Story navigation">
+      <button id="website-return" class="website-return-button" type="button" data-desktop-action="website-home">← 网站首页</button>
       <div class="panel-brand">
         <img class="panel-brand-lockup" src="assets/brand/echoloom-lockup.png" alt="EchoLoom — Stories weave. Companions stay." />
         <span id="desktop-demo-badge">Offline Prototype</span>
@@ -34,11 +43,11 @@
         <div class="phone-side phone-side-left-a" aria-hidden="true"></div>
         <div class="phone-side phone-side-left-b" aria-hidden="true"></div>
         <div class="phone-side phone-side-right" aria-hidden="true"></div>
-        <div id="app" class="app-viewport"></div>
+        <div id="app" class="app-viewport" tabindex="-1" aria-label="EchoLoom interactive story"></div>
       </div>
     </main>
 
-    <aside class="desktop-panel desktop-panel-right" aria-label="Prototype controls">
+    <aside class="desktop-panel desktop-panel-right" aria-label="Story and data controls">
       <div class="panel-heading-row">
         <div>
           <span class="eyebrow" id="control-eyebrow">Prototype</span>
@@ -87,13 +96,15 @@
   </div>
 
   <div id="modal-root"></div>
+  <div id="storage-notice" class="storage-notice" role="status" hidden></div>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
 
-  <script src="app/data.js?v=25"></script>
-  <script src="app/storage.js?v=17"></script>
+  <script src="app/data.js?v=27"></script>
+  <script src="app/storage.js?v=20"></script>
   <script src="app/story-engine.js?v=7"></script>
   <script src="app/reply-timing.js?v=2"></script>
-  <script src="app/api-engine.js?v=6"></script>
-  <script src="app/app.js?v=44"></script>
+  <script src="app/api-engine.js?v=7"></script>
+  <script src="app/app.js?v=48"></script>
+  <script src="app/website.js?v=1"></script>
 </body>
 </html>

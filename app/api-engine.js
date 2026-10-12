@@ -208,6 +208,10 @@
   }
 
   async function initialize() {
+    if (window.ECHOLOOM_PUBLIC?.offlineOnly) {
+      setRuntime({ configured: false, source: 'offline', state: 'ready' });
+      return { configured: false, model: null };
+    }
     if (runtime.configured !== null) return { configured: runtime.configured, model: runtime.model };
     if (providerDiscovery) return providerDiscovery;
     providerDiscovery = fetch(new URL('api/provider-status', document.baseURI), { headers: { accept: 'application/json' } })
@@ -226,7 +230,7 @@
 
   async function requestReply(method, input, engineState, options = {}) {
     const base = offlineResult(method, input, engineState, options);
-    const mode = ['auto', 'live', 'offline'].includes(options.aiMode) ? options.aiMode : 'auto';
+    const mode = window.ECHOLOOM_PUBLIC?.offlineOnly ? 'offline' : (['auto', 'live', 'offline'].includes(options.aiMode) ? options.aiMode : 'auto');
     const discovery = mode === 'auto' ? await initialize() : null;
     if (mode === 'offline' || (mode === 'auto' && !discovery?.configured)) {
       setRuntime({ source: 'offline', state: 'ready', errorCode: null, model: null });
@@ -267,6 +271,7 @@
   }
 
   async function localize(items, targetLanguage, options = {}) {
+    if (window.ECHOLOOM_PUBLIC?.offlineOnly) return { translations: [], skipped: true };
     const mode = ['auto', 'live', 'offline'].includes(options.aiMode) ? options.aiMode : 'auto';
     if (mode === 'offline' || !Array.isArray(items) || !items.length) return { translations: [], skipped: true };
     const discovery = mode === 'auto' ? await initialize() : null;
@@ -297,6 +302,7 @@
   }
 
   async function generateSceneBackground(scene, options = {}) {
+    if (window.ECHOLOOM_PUBLIC?.offlineOnly) return { skipped: true, fallback: false };
     if (options.aiMode === 'offline' || scene?.changed !== true) return { skipped: true, fallback: false };
     runtime.scene = { state: 'loading', cached: false, errorCode: null };
     const controller = new AbortController();
