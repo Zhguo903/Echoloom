@@ -51,4 +51,4 @@ The prototype now opens with a brand/title sequence and a persistent visual-nove
 
 Relationship dimensions are never presented as an affection score, and attraction or player wording never confirms romance, exclusivity, or consent automatically.
 
-See `README_ZH.md` for detailed Chinese instructions and `CODEX_START_HERE.md` for Codex workflows.
+See `README_ZH.md` for detailed Chinese instructions and [the development guide](docs/DEVELOPMENT.md) for contributor workflows.

@@ -162,8 +162,7 @@
       screenTogether: '共享场景',
       screenEchoes: '分型记忆',
       screenThreads: '故事档案',
-      screenSettings: '设置与导出',
-      codexReady: '项目已包含 AGENTS.md、Codex Skill 与可复制任务提示。'
+      screenSettings: '设置与导出'
     },
     en: {
       appName: 'EchoLoom',
@@ -327,8 +326,7 @@
       screenTogether: 'Shared scene',
       screenEchoes: 'Typed memory',
       screenThreads: 'Story archive',
-      screenSettings: 'Settings and export',
-      codexReady: 'The repository includes AGENTS.md, a Codex skill, and ready-to-use task prompts.'
+      screenSettings: 'Settings and export'
     }
   };
 

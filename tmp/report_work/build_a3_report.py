@@ -1,29 +1,21 @@
 from __future__ import annotations
 
-import sys
+import argparse
 from pathlib import Path
 
 from docx import Document
 from docx.enum.section import WD_SECTION
-from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor, Twips
 
 
-ROOT = Path("/Users/zihan/UofT/CSC454/EchoLoom_Interactive_Demo")
+ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "output" / "report" / "EchoLoom_A3_Report.docx"
 
-SKILL_SCRIPTS = Path(
-    "/Users/zihan/.codex/plugins/cache/openai-primary-runtime/"
-    "documents/26.802.11031/skills/documents/scripts"
-)
-sys.path.insert(0, str(SKILL_SCRIPTS))
-from table_geometry import apply_table_geometry  # noqa: E402
-
-
-# Resolved standard_business_brief tokens with one named EchoLoom brand override.
+# EchoLoom report layout tokens.
 FONT = "Calibri"
 BODY = RGBColor(40, 50, 65)
 NAVY = RGBColor(23, 32, 57)
@@ -41,6 +33,51 @@ WHITE = RGBColor(255, 255, 255)
 CONTENT_DXA = 9360
 TABLE_INDENT_DXA = 120
 CELL_MARGINS = {"top": 90, "bottom": 90, "start": 120, "end": 120}
+
+
+def apply_table_geometry(table, widths, *, table_width_dxa, indent_dxa, cell_margins_dxa):
+    """Keep the report's table, grid, and cell widths consistent in Word."""
+    widths = [int(width) for width in widths]
+    if not widths or any(width <= 0 for width in widths):
+        raise ValueError("Table column widths must be positive.")
+    if sum(widths) != table_width_dxa or len(table.columns) != len(widths):
+        raise ValueError("Table columns must match the requested total width.")
+    if any(len(row.cells) != len(widths) for row in table.rows):
+        raise ValueError("Report table rows must have one cell per column.")
+
+    def element(parent, tag, **attributes):
+        child = parent.find(qn(f"w:{tag}"))
+        if child is None:
+            child = OxmlElement(f"w:{tag}")
+            parent.append(child)
+        for key, value in attributes.items():
+            child.set(qn(f"w:{key}"), str(value))
+        return child
+
+    table.autofit = False
+    table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    properties = table._tbl.tblPr
+    element(properties, "tblW", type="dxa", w=table_width_dxa)
+    element(properties, "tblInd", type="dxa", w=indent_dxa)
+    element(properties, "tblLayout", type="fixed")
+    grid = table._tbl.tblGrid
+    for child in list(grid):
+        grid.remove(child)
+    for width in widths:
+        column = OxmlElement("w:gridCol")
+        column.set(qn("w:w"), str(width))
+        grid.append(column)
+    for column, width in zip(table.columns, widths):
+        column.width = Twips(width)
+    for row in table.rows:
+        row.height = None
+        for cell, width in zip(row.cells, widths):
+            cell.width = Twips(width)
+            properties = cell._tc.get_or_add_tcPr()
+            element(properties, "tcW", type="dxa", w=width)
+            margins = element(properties, "tcMar")
+            for side, margin in cell_margins_dxa.items():
+                element(margins, side, type="dxa", w=margin)
 
 
 SOURCES = {
@@ -538,7 +575,7 @@ def configure_document(doc):
     set_run_font(ffr, size=8.5, color=MUTED)
 
 
-def build_report():
+def build_report(output_path: Path = OUTPUT):
     doc = Document()
     configure_document(doc)
     bullet_num = make_numbering(doc, "bullet", "•", bullet=True)
@@ -1449,10 +1486,12 @@ def build_report():
     props.subject = "CSC454 and CSC491 Summer 2026"
     props.author = "EchoLoom team"
     props.keywords = "EchoLoom, Assignment 3, CSC454, CSC491, AI relationships, interactive fiction"
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(OUTPUT)
-    print(OUTPUT)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(output_path)
+    print(output_path)
 
 
 if __name__ == "__main__":
-    build_report()
+    parser = argparse.ArgumentParser(description="Build the EchoLoom coursework report.")
+    parser.add_argument("--output", type=Path, default=OUTPUT, help="Destination DOCX file.")
+    build_report(parser.parse_args().output)

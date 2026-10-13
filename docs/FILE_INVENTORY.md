@@ -11,7 +11,7 @@ This repository contains the EchoLoom website source and original artwork.
 | `supabase/` | Optional database migration and seed |
 | `tools/` | Development server, public builder and automated tests |
 | `docs/` | Product, architecture, design and research text documentation |
-| `.codex/skills/echoloom-prototype/` | Repository development guidance |
+| `AGENTS.md`, `docs/DEVELOPMENT.md` | Repository development guidance |
 
 Run `npm test`, `npm start`, or `npm run build:public` with Node.js 18+. No dependency installation is needed.
 

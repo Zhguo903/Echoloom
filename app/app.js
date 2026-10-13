@@ -1490,10 +1490,10 @@
         : runtime.configured === true
           ? langText('Gemini 已连接 · 所有自由对话优先使用', 'Gemini connected · preferred for every free conversation')
           : langText('Gemini 优先 · 离线回退已就绪', 'Gemini first · offline fallback ready');
-    document.getElementById('codex-ready-label').textContent = langText('密钥仅在服务端；结构化事件经过校验。', 'Keys stay server-side; structured events are validated.');
+    document.getElementById('runtime-details-label').textContent = langText('密钥仅在服务端；结构化事件经过校验。', 'Keys stay server-side; structured events are validated.');
     if (window.ECHOLOOM_PUBLIC?.offlineOnly) {
       document.getElementById('offline-label').textContent = langText('本机故事引擎 · 无需注册', 'Local story engine · no sign-up');
-      document.getElementById('codex-ready-label').textContent = langText('对话与记忆仅存此浏览器；可随时导出或删除。', 'Conversations and memories stay in this browser; export or delete at any time.');
+      document.getElementById('runtime-details-label').textContent = langText('对话与记忆仅存此浏览器；可随时导出或删除。', 'Conversations and memories stay in this browser; export or delete at any time.');
     }
   }
 

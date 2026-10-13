@@ -52,7 +52,7 @@ EchoLoom is a story-first AI relationship prototype. The product must feel like 
 - `app/styles.css`: design tokens and all visual styles.
 - `assets/`: original vector character and scene artwork.
 - `docs/`: product, research, demo, and architecture documentation.
-- `.codex/skills/echoloom-prototype/`: reusable product workflow for Codex.
+- `docs/DEVELOPMENT.md`: contributor workflow and validation guidance.
 
 ## Work process
 

@@ -29,13 +29,9 @@ macOS / Linux 可运行：
 
 关系数值不会自动确认恋爱、排他或身体亲密。只有双方确认对话能改变关系标签。
 
-【用 Codex 修改】
-先阅读 CODEX_START_HERE.md。
-在项目根目录运行：
-
-  codex
-
-Codex 会读取 AGENTS.md。可直接复制 CODEX_PROMPTS.md 中的任务。
+【继续开发】
+先阅读 docs/DEVELOPMENT.md 和 AGENTS.md，了解项目结构、开发规则与验证流程。
+多步骤修改请记录在 PLANS.md。
 
 【自动检查】
 

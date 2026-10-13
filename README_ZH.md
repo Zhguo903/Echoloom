@@ -142,10 +142,7 @@ EchoLoom_Interactive_Demo/
 ├── server/                     # Gemini、Supabase、场景缓存与服务端规则
 ├── supabase/                   # schema/RLS/RPC migration 与五角色 seed
 ├── docs/                       # 产品、研究、设计、技术与真实 AI 升级说明
-├── .codex/skills/              # 项目专属 Codex Skill
-├── AGENTS.md                   # Codex 自动读取的项目规则
-├── CODEX_START_HERE.md         # Codex 使用说明
-├── CODEX_PROMPTS.md            # 可直接复制的任务提示
+├── AGENTS.md                   # 项目开发规则
 └── PLANS.md                    # 长任务执行计划模板
 ```
 
@@ -157,18 +154,6 @@ npm test
 
 测试会检查核心文件、服务器/API 回退、双语结构化事件与旧内容补译、五章场景机制、schema v12 状态与 v11 至 v1 迁移、长对话上下文预算、413 压缩重试、Gemini 临时限流重试、当前 Gemini Interactions 响应解析、自动在线模式、应用规则控制的剧情标记、可追溯记忆、FLUX 场景触发与缓存复用、导入导出、关系信号、同意边界和角色敏感度。
 
-## 使用 Codex 修改
+## 继续开发
 
-先阅读 `CODEX_START_HERE.md`。在项目根目录运行：
-
-```bash
-codex
-```
-
-Codex 会自动读取根目录的 `AGENTS.md`。项目还包含 `.codex/skills/echoloom-prototype/SKILL.md`，可在 Codex 中通过以下方式明确调用：
-
-```text
-$echoloom-prototype
-```
-
-最常用的可复制任务已经放在 `CODEX_PROMPTS.md`。
+阅读 [开发指南](docs/DEVELOPMENT.md)、`AGENTS.md` 和 `docs/PRODUCT_BRIEF.md`，了解运行方式、代码结构、产品约束与验证要求。多步骤修改先记录在 `PLANS.md`，完成后运行 `npm test`，并验证手机和桌面效果。

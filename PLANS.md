@@ -1,5 +1,15 @@
 # EchoLink MVP Plan
 
+## Repository portability cleanup — 2026-10-13
+
+1. Replace editor-specific onboarding and task prompts with a neutral development guide, preserving product constraints and test instructions.
+2. Remove obsolete runtime copy and rename the desktop status element consistently; refresh matching script and offline-cache versions.
+3. Resolve report inputs relative to the repository and implement its table layout locally, removing the machine-specific helper import. Verify optional report generation into a temporary output.
+4. Replace personal-machine prefixes in presentation note citations with repository-relative paths while retaining source references; scan current tracked text and document metadata for editor branding and machine paths; run npm test and the public build, then check mobile/desktop startup and console output.
+5. Commit and normally push the validated current tree to origin/main, preserving existing history, and verify the remote commit.
+
+Validation: All seven npm test suites and the public build pass. Startup, bilingual status rendering, 393 × 852 mobile and 1440 × 1000 desktop layouts, and console checks pass. Tracked text, Office packages, and the report PDF are clear of editor branding and personal-machine paths. Twenty note citations across three decks now use repository-relative paths; all other package members are byte-identical. Report generation succeeds from a different working directory with unchanged document text and consistent widths in all 27 tables. Publication uses a normal commit and push; verify origin/main against HEAD after pushing.
+
 ## GitHub publication — 2026-10-12
 
 The user requested pushing the latest work to the existing origin/main. Validate the complete working tree with npm test and git diff --check, include the existing local commits plus current website/story improvements, keep credentials and generated handoff archives ignored, commit a portable project inventory, push normally without force, and verify that the remote branch matches the local commit. The detailed machine-specific inventory is preserved locally under ignored output/github/.
@@ -857,7 +867,7 @@ Validation:
 
 ### Product outcome
 
-Place the complete EchoLoom project in `Zhguo903/Echoloom` so the prototype, original assets, documentation, project-specific Codex guidance, and final A3 report are versioned together without publishing local credentials or redundant render caches.
+Place the complete EchoLoom project in `Zhguo903/Echoloom` so the prototype, original assets, documentation, contributor guidance, and final A3 report are versioned together without publishing local credentials or redundant render caches.
 
 ### Plan
 
